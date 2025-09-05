@@ -11,8 +11,7 @@ import {
   setDoc,
   deleteDoc,
   query,
-  where,
-  orderBy
+  where
 } from "firebase/firestore";
 
 interface User {
@@ -22,8 +21,8 @@ interface User {
   role: string;
   dept: string;
   email: string;
-  status: string;
-  jabatan?: string; // Tambahkan field jabatan
+  status?: string; // Made optional since it might not exist
+  jabatan?: string;
 }
 
 interface Department {
@@ -43,71 +42,94 @@ const DepartmentsPage = () => {
   const [newDeptName, setNewDeptName] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [debugInfo, setDebugInfo] = useState<string>("");
+  const [allUsersDebug, setAllUsersDebug] = useState<User[]>([]);
 
   // Load users dan departments
   useEffect(() => {
     const fetchData = async () => {
       try {
         console.log("🔄 Memulai fetch data dari Firestore...");
+        setDebugInfo("Sedang mengambil data...");
         
-        // 1. Fetch semua users aktif dari koleksi "users"
-        const allUsersQuery = query(
-          collection(db, "users"),
-          where("status", "==", "active")
-        );
-        
+        // 1. Fetch semua users dari koleksi "users" (TANPA FILTER APAPUN)
+        const allUsersQuery = collection(db, "users");
         const allUsersSnap = await getDocs(allUsersQuery);
         const allUsersList: User[] = allUsersSnap.docs.map((d) => ({
           id: d.id,
           ...d.data()
         } as User));
         
-        console.log("👥 Semua user aktif:", allUsersList);
-        setDebugInfo(`Total user aktif: ${allUsersList.length}`);
+        console.log("👥 Semua user dari Firestore:", allUsersList);
+        setAllUsersDebug(allUsersList);
+        
+        // 2. Debug setiap user untuk melihat field role dan jabatan
+        console.log("🔍 Detail analisis setiap user:");
+        allUsersList.forEach(user => {
+          console.log(`User: ${user.nama}`, {
+            id: user.id,
+            role: user.role,
+            jabatan: user.jabatan,
+            status: user.status,
+            dept: user.dept,
+            email: user.email
+          });
+        });
 
-        // 2. Filter hanya users dengan role manager/general_manager
-        // Perbaikan: Gunakan logika yang lebih luas untuk mencocokkan berbagai format role
+        // 3. Filter users yang bisa jadi manager (HAPUS FILTER STATUS)
         const managerUsers = allUsersList.filter(user => {
-          if (!user.role) return false;
+          // Skip users tanpa nama (data tidak valid)
+          if (!user.nama) {
+            console.log("❌ User tanpa nama, dilewati:", user);
+            return false;
+          }
           
-          const userRole = user.role.toLowerCase().trim();
+          // Cek role dan jabatan
+          const userRole = user.role ? user.role.toLowerCase().trim() : "";
           const userJabatan = user.jabatan ? user.jabatan.toLowerCase().trim() : "";
           
-          // Cek role dan jabatan untuk menentukan apakah user adalah manager
-          return (
+          const isManager = (
             userRole.includes("manager") ||
             userRole.includes("gm") ||
             userRole.includes("head") ||
+            userRole === "general_manager" ||
+            userRole === "general manager" ||
             userJabatan.includes("manager") ||
             userJabatan.includes("gm") ||
-            userJabatan.includes("head")
+            userJabatan.includes("head") ||
+            userJabatan.includes("kepala") ||
+            userJabatan.includes("supervisor") ||
+            userJabatan.includes("spv")
           );
+          
+          console.log(`✅ ${user.nama}: role="${userRole}", jabatan="${userJabatan}", isManager=${isManager}, status="${user.status || 'undefined'}"`);
+          
+          return isManager;
         });
         
-        console.log("🎯 Manager users yang difilter:", managerUsers);
+        console.log("🎯 Manager users yang berhasil difilter:", managerUsers);
         setUsers(managerUsers);
+        setDebugInfo(`Total user: ${allUsersList.length}, Manager users: ${managerUsers.length}`);
 
-        // 3. Fetch departments
+        // 4. Fetch departments
         const deptSnap = await getDocs(collection(db, "departments"));
         const deptList: Department[] = [];
         
         for (const doc of deptSnap.docs) {
           const deptData = doc.data();
-          console.log("📊 Department data:", deptData);
+          console.log("🏢 Department data:", deptData);
           
-          // Hitung jumlah karyawan di department ini (dari koleksi "users")
-          const employeesQuery = query(
-            collection(db, "users"),
-            where("dept", "==", deptData.name),
-            where("status", "==", "active")
-          );
-          
+          // Hitung jumlah karyawan di department ini
+          const employeesQuery = query(collection(db, "users"));
           const employeesSnap = await getDocs(employeesQuery);
+          const employeesInDept = employeesSnap.docs.filter(empDoc => {
+            const empData = empDoc.data();
+            return empData.dept === doc.id || empData.dept === deptData.name;
+          });
           
           deptList.push({
             id: doc.id,
             ...deptData,
-            employeeCount: employeesSnap.size
+            employeeCount: employeesInDept.length
           } as Department);
         }
         
@@ -117,7 +139,7 @@ const DepartmentsPage = () => {
         
       } catch (error) {
         console.error("❌ Error fetching data:", error);
-        setDebugInfo(`Error: ${error.message}`);
+        setDebugInfo(`Error: ${typeof error === "object" && error !== null && "message" in error ? (error as { message: string }).message : String(error)}`);
         setLoading(false);
       }
     };
@@ -229,15 +251,14 @@ const DepartmentsPage = () => {
     
     try {
       // Check if department has any employees
-      const employeesQuery = query(
-        collection(db, "users"),
-        where("dept", "==", deptName),
-        where("status", "==", "active")
-      );
-      
+      const employeesQuery = query(collection(db, "users"));
       const employeesSnap = await getDocs(employeesQuery);
+      const employeesInDept = employeesSnap.docs.filter(empDoc => {
+        const empData = empDoc.data();
+        return empData.dept === deptId || empData.dept === deptName;
+      });
       
-      if (employeesSnap.size > 0) {
+      if (employeesInDept.length > 0) {
         alert("Tidak dapat menghapus departemen yang masih memiliki karyawan aktif.");
         return;
       }
@@ -308,7 +329,7 @@ const DepartmentsPage = () => {
               </li>
               <li>
                 <Link href="/admin/roles" className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
-                  <span className="mr-3">🔐</span>
+                  <span className="mr-3">🔒</span>
                   Role Management
                 </Link>
               </li>
@@ -337,16 +358,53 @@ const DepartmentsPage = () => {
 
         {/* Main Content */}
         <main className="p-6">
-          {/* Debug Info */}
+          {/* Enhanced Debug Info */}
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
-            <h3 className="text-sm font-medium text-yellow-800 mb-2">🔍 Informasi Debug</h3>
-            <p className="text-xs text-yellow-700">Jumlah Manager Users: {users.length}</p>
+            <h3 className="text-sm font-medium text-yellow-800 mb-2">🔍 Informasi Debug Lengkap</h3>
+            <p className="text-xs text-yellow-700">Total user dari Firestore: {allUsersDebug.length}</p>
+            <p className="text-xs text-yellow-700">Manager users yang lolos filter: {users.length}</p>
             <p className="text-xs text-yellow-700">Jumlah Departments: {departments.length}</p>
             <p className="text-xs text-yellow-700">{debugInfo}</p>
+            
             <details className="mt-2">
-              <summary className="text-xs text-yellow-700 cursor-pointer">Lihat Detail Users</summary>
+              <summary className="text-xs text-yellow-700 cursor-pointer font-medium">📋 Lihat SEMUA User dari Firestore</summary>
+              <div className="text-xs bg-yellow-100 p-2 mt-1 overflow-auto max-h-60">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-1">Nama</th>
+                      <th className="text-left p-1">Role</th>
+                      <th className="text-left p-1">Jabatan</th>
+                      <th className="text-left p-1">Status</th>
+                      <th className="text-left p-1">Dept</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allUsersDebug.map(user => (
+                      <tr key={user.id} className="border-b">
+                        <td className="p-1">{user.nama || 'N/A'}</td>
+                        <td className="p-1">{user.role || 'N/A'}</td>
+                        <td className="p-1">{user.jabatan || 'N/A'}</td>
+                        <td className="p-1">{user.status || 'N/A'}</td>
+                        <td className="p-1">{user.dept || 'N/A'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+            
+            <details className="mt-2">
+              <summary className="text-xs text-yellow-700 cursor-pointer font-medium">✅ Manager Users (Yang Lolos Filter)</summary>
               <pre className="text-xs bg-yellow-100 p-2 mt-1 overflow-auto max-h-40">
                 {JSON.stringify(users, null, 2)}
+              </pre>
+            </details>
+            
+            <details className="mt-2">
+              <summary className="text-xs text-yellow-700 cursor-pointer">Lihat Detail Departments</summary>
+              <pre className="text-xs bg-yellow-100 p-2 mt-1 overflow-auto max-h-40">
+                {JSON.stringify(departments, null, 2)}
               </pre>
             </details>
           </div>
@@ -466,9 +524,9 @@ const DepartmentsPage = () => {
                         <td className="px-4 py-3 text-sm">
                           <button
                             onClick={() => handleDeleteDepartment(dept.id, dept.name)}
-                            disabled={dept.employeeCount > 0}
+                            disabled={(dept.employeeCount ?? 0) > 0}
                             className="text-red-600 hover:text-red-800 disabled:text-gray-400 disabled:cursor-not-allowed"
-                            title={dept.employeeCount > 0 ? "Tidak dapat menghapus departemen yang masih memiliki karyawan" : "Hapus departemen"}
+                            title={(dept.employeeCount ?? 0) > 0 ? "Tidak dapat menghapus departemen yang masih memiliki karyawan" : "Hapus departemen"}
                           >
                             🗑️ Hapus
                           </button>
@@ -493,10 +551,12 @@ const DepartmentsPage = () => {
                 <h3 className="text-sm font-medium text-blue-800">Informasi Penting</h3>
                 <div className="mt-2 text-sm text-blue-700">
                   <ul className="list-disc list-inside space-y-1">
-                    <li>User dengan role atau jabatan yang mengandung "manager", "gm", atau "head" dapat ditugaskan sebagai kepala departemen</li>
-                    <li>Pastikan role user sudah sesuai di koleksi "users"</li>
+                    <li>User dengan role atau jabatan yang mengandung manager dan general_manager dapat ditugaskan sebagai kepala departemen</li>
+                    <li>Filter sekarang mengabaikan status user - semua user dengan role manager akan ditampilkan</li>
+                    <li>Pastikan role atau jabatan user sudah sesuai di koleksi users</li>
                     <li>Departemen tidak dapat dihapus jika masih memiliki karyawan aktif</li>
                     <li>Penunjukkan manager departemen akan mempengaruhi alur approval form</li>
+                    <li>Field dept pada user bisa berisi ID department atau nama department</li>
                   </ul>
                 </div>
               </div>

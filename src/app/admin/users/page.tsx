@@ -21,8 +21,13 @@ interface Employee {
   telepon: string;
   role: string;
   status: string;
-  createdAt: any;
-  updatedAt: any;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+}
+
+interface Department {
+  id: string;
+  name: string;
 }
 
 const ManagementPage: React.FC = () => {
@@ -30,7 +35,8 @@ const ManagementPage: React.FC = () => {
   const [user] = useAuthState(auth);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
-  const [departments, setDepartments] = useState<string[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [departmentNames, setDepartmentNames] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showAddForm, setShowAddForm] = useState(false);
   const [showUploadForm, setShowUploadForm] = useState(false);
@@ -52,9 +58,10 @@ const ManagementPage: React.FC = () => {
     status: "active"
   });
 
-  // Load employees data
+  // Load employees and departments data
   useEffect(() => {
     fetchEmployees();
+    fetchDepartments();
   }, []);
 
   // Filter employees based on search and department filter
@@ -93,11 +100,29 @@ const ManagementPage: React.FC = () => {
       });
       
       setEmployees(employeesData);
-      setDepartments(Array.from(deptSet).sort());
       setIsLoading(false);
     } catch (error) {
       console.error("Error fetching employees:", error);
       setIsLoading(false);
+    }
+  };
+
+  const fetchDepartments = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, "departments"));
+      const departmentsData: Department[] = [];
+      const deptNames: string[] = [];
+      
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        departmentsData.push({ id: doc.id, name: data.name });
+        deptNames.push(data.name);
+      });
+      
+      setDepartments(departmentsData);
+      setDepartmentNames(deptNames.sort());
+    } catch (error) {
+      console.error("Error fetching departments:", error);
     }
   };
 
@@ -131,6 +156,13 @@ const ManagementPage: React.FC = () => {
       alert("Nomor telepon harus diisi!");
       return false;
     }
+
+    // Validasi department harus sesuai dengan yang sudah ada
+    if (!departmentNames.includes(formData.dept)) {
+      alert(`Department "${formData.dept}" tidak terdaftar. Silakan pilih department yang sudah ada.`);
+      return false;
+    }
+
     return true;
   };
 
@@ -266,7 +298,7 @@ const ManagementPage: React.FC = () => {
           return;
         }
 
-        processExcelData(jsonData);
+        processExcelData(jsonData as Employee[]);
       } catch (error) {
         console.error("Error reading Excel file:", error);
         alert("Terjadi kesalahan saat membaca file Excel. Pastikan format file benar.");
@@ -275,7 +307,7 @@ const ManagementPage: React.FC = () => {
     reader.readAsArrayBuffer(file);
   };
 
-  const processExcelData = async (data: any[]) => {
+  const processExcelData = async (data: Employee[]) => {
     setIsUploading(true);
     setUploadProgress(0);
     
@@ -294,8 +326,15 @@ const ManagementPage: React.FC = () => {
           continue;
         }
 
+        // Validasi department harus sesuai dengan yang sudah ada
+        if (!departmentNames.includes(row.dept.toString())) {
+          errors.push(`Baris ${i + 2}: Department "${row.dept}" tidak terdaftar`);
+          errorCount++;
+          continue;
+        }
+
         // Check if NIK already exists
-        const nikQuery = query(collection(db, "employees"), where("nik", "==", row.nik));
+        const nikQuery = query(collection(db, "employees"), where("nik", "==", row.nik.toString()));
         const nikSnapshot = await getDocs(nikQuery);
         
         if (!nikSnapshot.empty) {
@@ -305,7 +344,7 @@ const ManagementPage: React.FC = () => {
         }
 
         // Check if email already exists
-        const emailQuery = query(collection(db, "employees"), where("email", "==", row.email));
+        const emailQuery = query(collection(db, "employees"), where("email", "==", row.email.toString()));
         const emailSnapshot = await getDocs(emailQuery);
         
         if (!emailSnapshot.empty) {
@@ -369,11 +408,14 @@ const ManagementPage: React.FC = () => {
   };
 
   const downloadTemplate = () => {
+    // Gunakan department yang sudah ada sebagai contoh
+    const exampleDept = departmentNames.length > 0 ? departmentNames[0] : "IT";
+    
     const templateData = [
       {
         nik: "12345",
         nama: "John Doe",
-        dept: "IT",
+        dept: exampleDept,
         jabatan: "Developer",
         email: "john.doe@example.com",
         telepon: "08123456789",
@@ -382,9 +424,14 @@ const ManagementPage: React.FC = () => {
       }
     ];
 
-    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    // Tambahkan sheet dengan daftar department yang valid
+    const deptSheet = XLSX.utils.json_to_sheet(departmentNames.map(name => ({ department: name })));
+    const dataSheet = XLSX.utils.json_to_sheet(templateData);
+    
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Template");
+    XLSX.utils.book_append_sheet(workbook, dataSheet, "Template");
+    XLSX.utils.book_append_sheet(workbook, deptSheet, "Departments Tersedia");
+    
     XLSX.writeFile(workbook, "template_karyawan.xlsx");
   };
 
@@ -494,7 +541,7 @@ const ManagementPage: React.FC = () => {
                   className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                 >
                   <option value="">Semua Department</option>
-                  {departments.map(dept => (
+                  {departmentNames.map(dept => (
                     <option key={dept} value={dept}>{dept}</option>
                   ))}
                 </select>
@@ -520,7 +567,14 @@ const ManagementPage: React.FC = () => {
                   <li>Kolom opsional: telepon, role, status</li>
                   <li>Role default: staff | Status default: active</li>
                   <li>Format file: .xlsx atau .xls</li>
+                  <li>Department harus sesuai dengan yang sudah terdaftar</li>
                 </ul>
+                {departmentNames.length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-sm text-blue-700 font-medium">Departments yang tersedia:</p>
+                    <p className="text-sm text-blue-600">{departmentNames.join(", ")}</p>
+                  </div>
+                )}
                 <button
                   onClick={downloadTemplate}
                   className="mt-3 px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200 transition"
@@ -613,15 +667,19 @@ const ManagementPage: React.FC = () => {
                 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Department *</label>
-                  <input
-                    type="text"
+                  <select
                     name="dept"
                     value={formData.dept}
                     onChange={handleChange}
                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                     required
-                    placeholder="Nama department"
-                  />
+                  >
+                    <option value="">Pilih Department</option>
+                    {departmentNames.map(dept => (
+                      <option key={dept} value={dept}>{dept}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Harus sesuai dengan department yang sudah terdaftar</p>
                 </div>
                 
                 <div>
