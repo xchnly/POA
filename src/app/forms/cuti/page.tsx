@@ -6,8 +6,9 @@ import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { doc, setDoc, serverTimestamp, collection, getDocs, query, where, getDoc } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
-import Swal from 'sweetalert2'; // Import SweetAlert2
+import Swal from 'sweetalert2';
 
+// Interfaces (Pastikan ini sesuai dengan struktur data Anda di Firestore)
 interface UserData {
     uid: string;
     email: string | null;
@@ -25,17 +26,16 @@ interface Employee {
     jabatan: string;
 }
 
-interface OvertimeEntry {
+interface LeaveEntry {
     id: string;
     employee: Employee;
-    tanggal: string;
-    jamMulai: string;
-    jamSelesai: string;
-    breakTime: string;
-    totalJam: number;
+    tanggalMulai: string;
+    tanggalSelesai: string;
+    totalHari: number;
+    halfDayType?: "am" | "pm" | "";
 }
 
-const OvertimeRequestPage: React.FC = () => {
+const LeaveRequestPage: React.FC = () => {
     const router = useRouter();
     const [authUser] = useAuthState(auth);
     const [userProfile, setUserProfile] = useState<UserData | null>(null);
@@ -43,23 +43,22 @@ const OvertimeRequestPage: React.FC = () => {
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
     const [departments, setDepartments] = useState<string[]>([]);
-    const [overtimeEntries, setOvertimeEntries] = useState<OvertimeEntry[]>([]);
+    const [leaveEntries, setLeaveEntries] = useState<LeaveEntry[]>([]);
     const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
-    const [editingEntry, setEditingEntry] = useState<OvertimeEntry | null>(null);
+    const [isHalfDay, setIsHalfDay] = useState(false);
 
     const [formData, setFormData] = useState({
         jenisPengajuan: "diri-sendiri",
         deptFilter: "",
         alasan: "",
-        kategori: "reguler",
+        jenisCuti: "",
     });
 
     const [defaultEntry, setDefaultEntry] = useState({
-        tanggal: new Date().toISOString().split('T')[0],
-        jamMulai: "17:00",
-        jamSelesai: "20:00",
-        breakTime: "0",
-        totalJam: 3
+        tanggalMulai: new Date().toISOString().split('T')[0],
+        tanggalSelesai: new Date().toISOString().split('T')[0],
+        totalHari: 1,
+        halfDayType: ""
     });
 
     // Fetch full user data after auth state is ready
@@ -77,10 +76,10 @@ const OvertimeRequestPage: React.FC = () => {
                         icon: 'error',
                         title: 'Data Pengguna Tidak Ditemukan',
                         text: 'Silakan hubungi dukungan teknis.'
-                    }).then(() => router.push("/login"));
+                    }).then(() => router.push("/"));
                 }
             } else {
-                router.push("/login");
+                router.push("/");
             }
         };
         fetchUserData();
@@ -129,18 +128,35 @@ const OvertimeRequestPage: React.FC = () => {
         setFormData(prev => ({ ...prev, [name]: value }));
     };
 
+    const handleHalfDayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setIsHalfDay(e.target.checked);
+        if (e.target.checked) {
+            // If half-day is checked, set end date to be the same as start date
+            setDefaultEntry(prev => ({ ...prev, tanggalSelesai: prev.tanggalMulai, halfDayType: "am" }));
+        } else {
+            setDefaultEntry(prev => ({ ...prev, halfDayType: "" }));
+        }
+    };
+
+    const calculateTotalDays = (mulai: string, selesai: string): number => {
+        const startDate = new Date(mulai);
+        const endDate = new Date(selesai);
+        const timeDiff = endDate.getTime() - startDate.getTime();
+        const diffDays = Math.ceil(timeDiff / (1000 * 3600 * 24)) + 1;
+        return diffDays;
+    };
+
     const handleDefaultEntryChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setDefaultEntry(prev => {
             const newEntry = { ...prev, [name]: value };
             
-            if (name === "jamMulai" || name === "jamSelesai" || name === "breakTime") {
-                const totalJam = calculateTotalHours(
-                    name === "jamMulai" ? value : prev.jamMulai,
-                    name === "jamSelesai" ? value : prev.jamSelesai,
-                    name === "breakTime" ? value : prev.breakTime
+            if (name === "tanggalMulai" || name === "tanggalSelesai") {
+                const totalHari = calculateTotalDays(
+                    name === "tanggalMulai" ? value : prev.tanggalMulai,
+                    name === "tanggalSelesai" ? value : prev.tanggalSelesai
                 );
-                return { ...newEntry, totalJam };
+                return { ...newEntry, totalHari };
             }
             
             return newEntry;
@@ -150,17 +166,16 @@ const OvertimeRequestPage: React.FC = () => {
     const handleEntryChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>, entryId: string) => {
         const { name, value } = e.target;
         
-        setOvertimeEntries(prev => prev.map(entry => {
+        setLeaveEntries(prev => prev.map(entry => {
             if (entry.id === entryId) {
                 const updatedEntry = { ...entry, [name]: value };
                 
-                if (name === "jamMulai" || name === "jamSelesai" || name === "breakTime") {
-                    const totalJam = calculateTotalHours(
-                        name === "jamMulai" ? value : entry.jamMulai,
-                        name === "jamSelesai" ? value : entry.jamSelesai,
-                        name === "breakTime" ? value : entry.breakTime
+                if (name === "tanggalMulai" || name === "tanggalSelesai") {
+                    const totalHari = calculateTotalDays(
+                        name === "tanggalMulai" ? value : entry.tanggalMulai,
+                        name === "tanggalSelesai" ? value : entry.tanggalSelesai
                     );
-                    return { ...updatedEntry, totalJam };
+                    return { ...updatedEntry, totalHari };
                 }
                 
                 return updatedEntry;
@@ -169,27 +184,7 @@ const OvertimeRequestPage: React.FC = () => {
         }));
     };
 
-    const calculateTotalHours = (jamMulai: string, jamSelesai: string, breakTime: string): number => {
-        if (jamMulai && jamSelesai) {
-            const start = new Date(`2000-01-01T${jamMulai}`);
-            const end = new Date(`2000-01-01T${jamSelesai}`);
-
-            if (end <= start) {
-                end.setDate(end.getDate() + 1);
-            }
-
-            const diffMs = end.getTime() - start.getTime();
-            let diffHours = diffMs / (1000 * 60 * 60);
-
-            const breakHours = parseInt(breakTime) / 60;
-            diffHours = Math.max(0, diffHours - breakHours);
-
-            return Math.ceil(diffHours * 2) / 2;
-        }
-        return 0;
-    };
-
-    const addOvertimeEntries = async () => {
+    const addLeaveEntries = async () => {
         if (selectedEmployees.length === 0) {
             await Swal.fire({
                 icon: 'warning',
@@ -200,17 +195,16 @@ const OvertimeRequestPage: React.FC = () => {
         }
 
         const newEntries = selectedEmployees
-            .filter(empId => !overtimeEntries.some(entry => entry.employee.id === empId))
+            .filter(empId => !leaveEntries.some(entry => entry.employee.id === empId))
             .map(empId => {
                 const emp = filteredEmployees.find(e => e.id === empId);
                 return {
                     id: `entry-${Date.now()}-${empId}`,
                     employee: emp!,
-                    tanggal: defaultEntry.tanggal,
-                    jamMulai: defaultEntry.jamMulai,
-                    jamSelesai: defaultEntry.jamSelesai,
-                    breakTime: defaultEntry.breakTime,
-                    totalJam: defaultEntry.totalJam
+                    tanggalMulai: defaultEntry.tanggalMulai,
+                    tanggalSelesai: isHalfDay ? defaultEntry.tanggalMulai : defaultEntry.tanggalSelesai,
+                    totalHari: isHalfDay ? 0.5 : calculateTotalDays(defaultEntry.tanggalMulai, defaultEntry.tanggalSelesai),
+                    halfDayType: isHalfDay ? defaultEntry.halfDayType : ""
                 };
             });
 
@@ -218,52 +212,44 @@ const OvertimeRequestPage: React.FC = () => {
             await Swal.fire({
                 icon: 'info',
                 title: 'Informasi',
-                text: 'Semua karyawan yang dipilih sudah ada di daftar!'
+                text: 'Semua karyawan yang dipilih sudah ada di daftar.'
             });
             return;
         }
 
-        setOvertimeEntries(prev => [...prev, ...newEntries]);
+        setLeaveEntries(prev => [...prev, ...newEntries]);
         setSelectedEmployees([]);
     };
 
-    const removeOvertimeEntry = async (entryId: string) => {
-        const result = await Swal.fire({
-            title: 'Hapus data ini?',
-            text: "Anda tidak bisa mengembalikan ini!",
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Ya, hapus!'
-        });
-        
-        if (result.isConfirmed) {
-            setOvertimeEntries(prev => prev.filter(entry => entry.id !== entryId));
-            Swal.fire(
-                'Terhapus!',
-                'Data lembur telah dihapus.',
-                'success'
-            );
-        }
+    const removeLeaveEntry = (entryId: string) => {
+        setLeaveEntries(prev => prev.filter(entry => entry.id !== entryId));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!userProfile) return;
 
-        if (formData.jenisPengajuan === "untuk-anggota" && overtimeEntries.length === 0) {
+        if (formData.jenisCuti === "") {
             await Swal.fire({
                 icon: 'warning',
                 title: 'Peringatan',
-                text: 'Tambahkan minimal satu karyawan untuk diajukan overtime!'
+                text: 'Pilih jenis cuti terlebih dahulu!'
             });
             return;
         }
-        
+
+        if (formData.jenisPengajuan === "untuk-anggota" && leaveEntries.length === 0) {
+            await Swal.fire({
+                icon: 'warning',
+                title: 'Peringatan',
+                text: 'Tambahkan minimal satu karyawan untuk diajukan cuti!'
+            });
+            return;
+        }
+
         const confirmationResult = await Swal.fire({
             title: 'Apakah Anda yakin?',
-            text: 'Anda akan mengajukan formulir lembur ini. Pastikan semua data sudah benar.',
+            text: 'Anda akan mengajukan formulir cuti ini. Pastikan semua data sudah benar.',
             icon: 'question',
             showCancelButton: true,
             confirmButtonText: 'Ya, Ajukan!',
@@ -275,14 +261,14 @@ const OvertimeRequestPage: React.FC = () => {
         if (confirmationResult.isConfirmed) {
             setIsSubmitting(true);
             try {
-                const formId = `overtime-${Date.now()}`;
+                const formId = `cuti-${Date.now()}`;
 
-                const overtimeData = {
+                const leaveData = {
                     id: formId,
-                    type: "overtime",
+                    type: "leave",
                     jenisPengajuan: formData.jenisPengajuan,
                     alasan: formData.alasan,
-                    kategori: formData.kategori,
+                    jenisCuti: formData.jenisCuti,
                     status: "pending",
                     requesterUid: userProfile.uid,
                     requesterName: userProfile.nama,
@@ -292,7 +278,7 @@ const OvertimeRequestPage: React.FC = () => {
                 };
 
                 if (formData.jenisPengajuan === "diri-sendiri") {
-                    Object.assign(overtimeData, {
+                    Object.assign(leaveData, {
                         entries: [{
                             employee: {
                                 id: userProfile.uid,
@@ -300,37 +286,35 @@ const OvertimeRequestPage: React.FC = () => {
                                 nama: userProfile.nama,
                                 dept: userProfile.dept
                             },
-                            tanggal: defaultEntry.tanggal,
-                            jamMulai: defaultEntry.jamMulai,
-                            jamSelesai: defaultEntry.jamSelesai,
-                            breakTime: parseInt(defaultEntry.breakTime),
-                            totalJam: defaultEntry.totalJam
+                            tanggalMulai: defaultEntry.tanggalMulai,
+                            tanggalSelesai: isHalfDay ? defaultEntry.tanggalMulai : defaultEntry.tanggalSelesai,
+                            totalHari: isHalfDay ? 0.5 : defaultEntry.totalHari,
+                            halfDayType: isHalfDay ? defaultEntry.halfDayType : ""
                         }]
                     });
                 } else {
-                    Object.assign(overtimeData, {
-                        entries: overtimeEntries.map(entry => ({
+                    Object.assign(leaveData, {
+                        entries: leaveEntries.map(entry => ({
                             employee: {
                                 id: entry.employee.id,
                                 nik: entry.employee.nik,
                                 nama: entry.employee.nama,
                                 dept: entry.employee.dept
                             },
-                            tanggal: entry.tanggal,
-                            jamMulai: entry.jamMulai,
-                            jamSelesai: entry.jamSelesai,
-                            breakTime: parseInt(entry.breakTime),
-                            totalJam: entry.totalJam
+                            tanggalMulai: entry.tanggalMulai,
+                            tanggalSelesai: entry.tanggalSelesai,
+                            totalHari: entry.totalHari,
+                            halfDayType: entry.halfDayType
                         }))
                     });
                 }
 
-                await setDoc(doc(db, "forms", formId), overtimeData);
+                await setDoc(doc(db, "forms", formId), leaveData);
 
                 Swal.fire({
                     icon: 'success',
                     title: 'Berhasil!',
-                    text: 'Form lembur berhasil diajukan.',
+                    text: 'Form cuti berhasil diajukan.',
                     timer: 2000,
                     showConfirmButton: false
                 }).then(() => {
@@ -350,7 +334,7 @@ const OvertimeRequestPage: React.FC = () => {
         }
     };
 
-    const totalAllHours = overtimeEntries.reduce((sum, entry) => sum + entry.totalJam, 0);
+    const totalAllDays = leaveEntries.reduce((sum, entry) => sum + entry.totalHari, 0);
 
     if (!userProfile) {
         return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">Loading user data...</div>;
@@ -380,7 +364,7 @@ const OvertimeRequestPage: React.FC = () => {
                     </div>
 
                     <div className="mb-6">
-                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Form Overtime</h2>
+                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Form Cuti</h2>
                         <ul className="space-y-1">
                             <li>
                                 <div className="flex items-center p-2 rounded-lg bg-green-50 text-green-700 font-medium">
@@ -399,8 +383,8 @@ const OvertimeRequestPage: React.FC = () => {
                 <header className="bg-white shadow-sm border-b border-green-100">
                     <div className="flex items-center justify-between p-4">
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Form Overtime Request</h1>
-                            <p className="text-sm text-gray-500">Ajukan lembur untuk diri sendiri atau anggota tim</p>
+                            <h1 className="text-2xl font-bold text-gray-900">Form Cuti</h1>
+                            <p className="text-sm text-gray-500">Ajukan cuti untuk diri sendiri atau anggota tim</p>
                         </div>
                         <div className="flex space-x-2">
                             <button className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">
@@ -436,7 +420,7 @@ const OvertimeRequestPage: React.FC = () => {
                                         />
                                         <div className="ml-3">
                                             <span className="block text-sm font-medium text-gray-900">Untuk Diri Sendiri</span>
-                                            <span className="block text-sm text-gray-500">Ajukan lembur untuk diri sendiri</span>
+                                            <span className="block text-sm text-gray-500">Ajukan cuti untuk diri sendiri</span>
                                         </div>
                                     </label>
 
@@ -451,92 +435,95 @@ const OvertimeRequestPage: React.FC = () => {
                                         />
                                         <div className="ml-3">
                                             <span className="block text-sm font-medium text-gray-900">Untuk Anggota Tim</span>
-                                            <span className="block text-sm text-gray-500">Ajukan lembur untuk anggota tim/department</span>
+                                            <span className="block text-sm text-gray-500">Ajukan cuti untuk anggota tim/department</span>
                                         </div>
                                     </label>
                                 </div>
+                            </div>
+                            
+                            {/* Jenis Cuti */}
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Jenis Cuti</h3>
+                                <select
+                                    name="jenisCuti"
+                                    value={formData.jenisCuti}
+                                    onChange={handleChange}
+                                    className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                                    required
+                                >
+                                    <option value="">Pilih Jenis Cuti</option>
+                                    <option value="cuti_tahunan">Cuti Tahunan</option>
+                                    <option value="cuti_sakit">Cuti Sakit</option>
+                                    <option value="cuti_melahirkan">Cuti Melahirkan</option>
+                                    <option value="cuti_menikah">Cuti Menikah</option>
+                                    <option value="cuti_lainnya">Cuti Lainnya</option>
+                                </select>
                             </div>
 
                             {/* Form untuk Diri Sendiri */}
                             {formData.jenisPengajuan === "diri-sendiri" && (
                                 <div>
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Detail Lembur</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Detail Cuti</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Lembur</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Mulai</label>
                                             <input
                                                 type="date"
-                                                name="tanggal"
-                                                value={defaultEntry.tanggal}
+                                                name="tanggalMulai"
+                                                value={defaultEntry.tanggalMulai}
                                                 onChange={handleDefaultEntryChange}
                                                 className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                 required
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Jam Mulai</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Selesai</label>
                                             <input
-                                                type="time"
-                                                name="jamMulai"
-                                                value={defaultEntry.jamMulai}
+                                                type="date"
+                                                name="tanggalSelesai"
+                                                value={defaultEntry.tanggalSelesai}
                                                 onChange={handleDefaultEntryChange}
-                                                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                                                disabled={isHalfDay}
+                                                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition disabled:bg-gray-100"
                                                 required
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Jam Selesai</label>
-                                            <input
-                                                type="time"
-                                                name="jamSelesai"
-                                                value={defaultEntry.jamSelesai}
-                                                onChange={handleDefaultEntryChange}
-                                                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
-                                                required
-                                            />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Break Time</label>
-                                            <select
-                                                name="breakTime"
-                                                value={defaultEntry.breakTime}
-                                                onChange={handleDefaultEntryChange}
-                                                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
-                                            >
-                                                <option value="0">Tidak ada break</option>
-                                                <option value="30">30 menit</option>
-                                                <option value="60">60 menit (1 jam)</option>
-                                                <option value="90">90 menit (1.5 jam)</option>
-                                                <option value="120">120 menit (2 jam)</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Total Jam Lembur</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Total Hari Cuti</label>
                                             <div className="relative">
                                                 <input
                                                     type="text"
-                                                    value={defaultEntry.totalJam.toFixed(1)}
+                                                    value={isHalfDay ? "0.5" : defaultEntry.totalHari}
                                                     readOnly
                                                     className="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                 />
-                                                <span className="absolute right-3 top-2.5 text-gray-500">Jam</span>
+                                                <span className="absolute right-3 top-2.5 text-gray-500">Hari</span>
                                             </div>
                                         </div>
-                                        <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Kategori Lembur</label>
+                                    </div>
+                                    
+                                    <div className="mt-4 flex items-center">
+                                        <input
+                                            type="checkbox"
+                                            id="halfDay"
+                                            checked={isHalfDay}
+                                            onChange={handleHalfDayChange}
+                                            className="mr-2 text-green-600 focus:ring-green-500"
+                                        />
+                                        <label htmlFor="halfDay" className="text-sm font-medium text-gray-700">
+                                            Cuti Setengah Hari
+                                        </label>
+                                        {isHalfDay && (
                                             <select
-                                                name="kategori"
-                                                value={formData.kategori}
-                                                onChange={handleChange}
-                                                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                                                name="halfDayType"
+                                                value={defaultEntry.halfDayType}
+                                                onChange={handleDefaultEntryChange}
+                                                className="ml-4 p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                             >
-                                                <option value="reguler">Lembur Reguler</option>
-                                                <option value="weekend">Lembur Weekend</option>
-                                                <option value="holiday">Lembur Hari Libur</option>
+                                                <option value="am">Pagi (AM)</option>
+                                                <option value="pm">Siang (PM)</option>
                                             </select>
-                                        </div>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -566,26 +553,6 @@ const OvertimeRequestPage: React.FC = () => {
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                                     Pilih Karyawan
                                                 </label>
-
-                                                <div className="flex items-center mb-2">
-                                                    <input
-                                                        type="checkbox"
-                                                        id="selectAll"
-                                                        checked={selectedEmployees.length === filteredEmployees.length && filteredEmployees.length > 0}
-                                                        onChange={(e) => {
-                                                            if (e.target.checked) {
-                                                                setSelectedEmployees(filteredEmployees.map((emp) => emp.id));
-                                                            } else {
-                                                                setSelectedEmployees([]);
-                                                            }
-                                                        }}
-                                                        className="mr-2"
-                                                    />
-                                                    <label htmlFor="selectAll" className="text-sm font-medium text-gray-700">
-                                                        Pilih Semua
-                                                    </label>
-                                                </div>
-
                                                 <div className="max-h-60 overflow-y-auto border rounded-lg p-2">
                                                     {filteredEmployees.map((emp) => (
                                                         <div key={emp.id} className="flex items-center mb-1">
@@ -613,69 +580,69 @@ const OvertimeRequestPage: React.FC = () => {
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Default</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Mulai Default</label>
                                                 <input
                                                     type="date"
-                                                    name="tanggal"
-                                                    value={defaultEntry.tanggal}
+                                                    name="tanggalMulai"
+                                                    value={defaultEntry.tanggalMulai}
                                                     onChange={handleDefaultEntryChange}
                                                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Jam Mulai Default</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Selesai Default</label>
                                                 <input
-                                                    type="time"
-                                                    name="jamMulai"
-                                                    value={defaultEntry.jamMulai}
+                                                    type="date"
+                                                    name="tanggalSelesai"
+                                                    value={defaultEntry.tanggalSelesai}
                                                     onChange={handleDefaultEntryChange}
-                                                    className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                                                    disabled={isHalfDay}
+                                                    className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition disabled:bg-gray-100"
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Jam Selesai Default</label>
-                                                <input
-                                                    type="time"
-                                                    name="jamSelesai"
-                                                    value={defaultEntry.jamSelesai}
-                                                    onChange={handleDefaultEntryChange}
-                                                    className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Break Time Default</label>
-                                                <select
-                                                    name="breakTime"
-                                                    value={defaultEntry.breakTime}
-                                                    onChange={handleDefaultEntryChange}
-                                                    className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
-                                                >
-                                                    <option value="0">Tidak ada break</option>
-                                                    <option value="30">30 menit</option>
-                                                    <option value="60">60 menit (1 jam)</option>
-                                                    <option value="90">90 menit (1.5 jam)</option>
-                                                    <option value="120">120 menit (2 jam)</option>
-                                                </select>
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Total Jam Default</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Total Hari Default</label>
                                                 <div className="flex">
                                                     <input
                                                         type="text"
-                                                        value={defaultEntry.totalJam.toFixed(1)}
+                                                        value={isHalfDay ? "0.5" : defaultEntry.totalHari}
                                                         readOnly
                                                         className="flex-1 p-2.5 border border-gray-300 rounded-l-lg bg-gray-50 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                     />
-                                                    <span className="bg-gray-200 px-3 flex items-center rounded-r-lg text-gray-500">Jam</span>
+                                                    <span className="bg-gray-200 px-3 flex items-center rounded-r-lg text-gray-500">Hari</span>
                                                 </div>
                                             </div>
                                         </div>
 
+                                        <div className="flex items-center mb-4">
+                                            <input
+                                                type="checkbox"
+                                                id="halfDayTeam"
+                                                checked={isHalfDay}
+                                                onChange={handleHalfDayChange}
+                                                className="mr-2 text-green-600 focus:ring-green-500"
+                                            />
+                                            <label htmlFor="halfDayTeam" className="text-sm font-medium text-gray-700">
+                                                Cuti Setengah Hari
+                                            </label>
+                                            {isHalfDay && (
+                                                <select
+                                                    name="halfDayType"
+                                                    value={defaultEntry.halfDayType}
+                                                    onChange={handleDefaultEntryChange}
+                                                    className="ml-4 p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                                                >
+                                                    <option value="am">Pagi (AM)</option>
+                                                    <option value="pm">Siang (PM)</option>
+                                                </select>
+                                            )}
+                                        </div>
+
                                         <button
                                             type="button"
-                                            onClick={addOvertimeEntries}
+                                            onClick={addLeaveEntries}
                                             disabled={selectedEmployees.length === 0}
                                             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                                         >
@@ -684,12 +651,12 @@ const OvertimeRequestPage: React.FC = () => {
                                     </div>
 
                                     {/* Daftar Karyawan yang Sudah Ditambahkan */}
-                                    {overtimeEntries.length > 0 && (
+                                    {leaveEntries.length > 0 && (
                                         <div>
                                             <div className="flex justify-between items-center mb-4">
-                                                <h3 className="text-lg font-semibold text-gray-900">Daftar Lembur Anggota Tim</h3>
+                                                <h3 className="text-lg font-semibold text-gray-900">Daftar Cuti Anggota Tim</h3>
                                                 <div className="text-sm font-medium text-gray-700">
-                                                    Total: {totalAllHours.toFixed(1)} jam
+                                                    Total: {totalAllDays} Hari
                                                 </div>
                                             </div>
 
@@ -700,16 +667,14 @@ const OvertimeRequestPage: React.FC = () => {
                                                             <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Nama</th>
                                                             <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">NIK</th>
                                                             <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Dept</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Tanggal</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Jam Mulai</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Jam Selesai</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Break</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Total</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Mulai</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Selesai</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Hari</th>
                                                             <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Aksi</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-gray-200">
-                                                        {overtimeEntries.map((entry) => (
+                                                        {leaveEntries.map((entry) => (
                                                             <tr key={entry.id}>
                                                                 <td className="px-4 py-2 text-sm">{entry.employee.nama}</td>
                                                                 <td className="px-4 py-2 text-sm text-gray-600">{entry.employee.nik}</td>
@@ -717,51 +682,28 @@ const OvertimeRequestPage: React.FC = () => {
                                                                 <td className="px-4 py-2 text-sm">
                                                                     <input
                                                                         type="date"
-                                                                        name="tanggal"
-                                                                        value={entry.tanggal}
+                                                                        name="tanggalMulai"
+                                                                        value={entry.tanggalMulai}
                                                                         onChange={(e) => handleEntryChange(e, entry.id)}
                                                                         className="w-full p-1 border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
                                                                     />
                                                                 </td>
                                                                 <td className="px-4 py-2 text-sm">
                                                                     <input
-                                                                        type="time"
-                                                                        name="jamMulai"
-                                                                        value={entry.jamMulai}
+                                                                        type="date"
+                                                                        name="tanggalSelesai"
+                                                                        value={entry.tanggalSelesai}
                                                                         onChange={(e) => handleEntryChange(e, entry.id)}
                                                                         className="w-full p-1 border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
                                                                     />
-                                                                </td>
-                                                                <td className="px-4 py-2 text-sm">
-                                                                    <input
-                                                                        type="time"
-                                                                        name="jamSelesai"
-                                                                        value={entry.jamSelesai}
-                                                                        onChange={(e) => handleEntryChange(e, entry.id)}
-                                                                        className="w-full p-1 border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
-                                                                    />
-                                                                </td>
-                                                                <td className="px-4 py-2 text-sm">
-                                                                    <select
-                                                                        name="breakTime"
-                                                                        value={entry.breakTime}
-                                                                        onChange={(e) => handleEntryChange(e, entry.id)}
-                                                                        className="w-full p-1 border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
-                                                                    >
-                                                                        <option value="0">0m</option>
-                                                                        <option value="30">30m</option>
-                                                                        <option value="60">60m</option>
-                                                                        <option value="90">90m</option>
-                                                                        <option value="120">120m</option>
-                                                                    </select>
                                                                 </td>
                                                                 <td className="px-4 py-2 text-sm font-medium">
-                                                                    {entry.totalJam.toFixed(1)} jam
+                                                                    {entry.totalHari} Hari
                                                                 </td>
                                                                 <td className="px-4 py-2 text-sm">
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() => removeOvertimeEntry(entry.id)}
+                                                                        onClick={() => removeLeaveEntry(entry.id)}
                                                                         className="text-red-600 hover:text-red-800"
                                                                     >
                                                                         Hapus
@@ -777,15 +719,15 @@ const OvertimeRequestPage: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Alasan Lembur */}
+                            {/* Alasan Cuti */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Alasan Lembur</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Alasan Cuti</label>
                                 <textarea
                                     name="alasan"
                                     value={formData.alasan}
                                     onChange={handleChange}
                                     rows={3}
-                                    placeholder="Jelaskan alasan mengapa perlu melakukan lembur"
+                                    placeholder="Jelaskan alasan mengapa perlu mengambil cuti"
                                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                     required
                                 />
@@ -804,7 +746,7 @@ const OvertimeRequestPage: React.FC = () => {
                                     disabled={isSubmitting}
                                     className="px-6 py-2.5 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] disabled:opacity-50 transition"
                                 >
-                                    {isSubmitting ? "Mengajukan..." : "Ajukan Overtime"}
+                                    {isSubmitting ? "Mengajukan..." : "Ajukan Cuti"}
                                 </button>
                             </div>
                         </form>
@@ -822,11 +764,9 @@ const OvertimeRequestPage: React.FC = () => {
                                 <h3 className="text-sm font-medium text-yellow-800">Informasi Penting</h3>
                                 <div className="mt-2 text-sm text-yellow-700">
                                     <ul className="list-disc list-inside space-y-1">
-                                        <li>Waktu break dibulatkan ke kelipatan 30 menit</li>
-                                        <li>Untuk anggota tim, setiap orang bisa memiliki jam lembur yang berbeda</li>
-                                        <li>Anda dapat mengedit jam lembur per individu setelah menambahkan karyawan</li>
-                                        <li>Pastikan lembur telah mendapatkan persetujuan atasan langsung</li>
-                                        <li>Form harus diajukan maksimal H+1 setelah lembur dilakukan</li>
+                                        <li>Ajukan cuti untuk diri sendiri atau untuk tim Anda</li>
+                                        <li>Anda dapat mengedit rentang tanggal per individu setelah menambahkan karyawan</li>
+                                        <li>Pastikan cuti telah mendapatkan persetujuan atasan langsung</li>
                                     </ul>
                                 </div>
                             </div>
@@ -838,4 +778,4 @@ const OvertimeRequestPage: React.FC = () => {
     );
 };
 
-export default OvertimeRequestPage;
+export default LeaveRequestPage;

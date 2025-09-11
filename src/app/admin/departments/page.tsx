@@ -327,12 +327,6 @@ const DepartmentsPage = () => {
                   Department
                 </div>
               </li>
-              <li>
-                <Link href="/admin/roles" className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
-                  <span className="mr-3">🔒</span>
-                  Role Management
-                </Link>
-              </li>
             </ul>
           </div>
         </nav>
