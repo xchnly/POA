@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { doc, setDoc, serverTimestamp, collection, getDocs, query, where, getDoc } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
-import Swal from 'sweetalert2'; // Import SweetAlert2
+import Swal from 'sweetalert2';
+import { onAuthStateChanged, signOut } from "firebase/auth";
 
 interface UserData {
     uid: string;
@@ -15,6 +16,7 @@ interface UserData {
     nik: string;
     dept: string;
     jabatan: string;
+    role: string;
 }
 
 interface Employee {
@@ -45,7 +47,9 @@ const OvertimeRequestPage: React.FC = () => {
     const [departments, setDepartments] = useState<string[]>([]);
     const [overtimeEntries, setOvertimeEntries] = useState<OvertimeEntry[]>([]);
     const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
-    const [editingEntry, setEditingEntry] = useState<OvertimeEntry | null>(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+    const [isLoading, setIsLoading] = useState(true);
+    const [pendingApprovals, setPendingApprovals] = useState<number>(0);
 
     const [formData, setFormData] = useState({
         jenisPengajuan: "diri-sendiri",
@@ -62,57 +66,72 @@ const OvertimeRequestPage: React.FC = () => {
         totalJam: 3
     });
 
-    // Fetch full user data after auth state is ready
+    // Fetch user data and pending approvals
     useEffect(() => {
-        const fetchUserData = async () => {
-            if (authUser) {
-                const userDocRef = doc(db, "users", authUser.uid);
+        const unsubscribe = onAuthStateChanged(auth, async (user) => {
+            if (!user) {
+                router.push("/");
+                return;
+            }
+            try {
+                const userDocRef = doc(db, "users", user.uid);
                 const userDocSnap = await getDoc(userDocRef);
+
                 if (userDocSnap.exists()) {
-                    const data = userDocSnap.data() as UserData;
-                    setUserProfile({ ...data, uid: authUser.uid, email: authUser.email });
+                    const userData = userDocSnap.data() as UserData;
+                    setUserProfile(userData);
+
+                    const allowedRoles = ["hrd", "admin", "manager", "general_manager"];
+                    if (!allowedRoles.includes(userData.role)) {
+                      // Fetch pending approvals for sidebar count
+                      const pendingQuery = query(collection(db, "forms"), where(`approvers.${userData.role}`, "==", userData.uid), where("status", "==", "in_review"));
+                      const pendingSnapshot = await getDocs(pendingQuery);
+                      setPendingApprovals(pendingSnapshot.docs.length);
+                    }
+
                 } else {
                     console.error("User document not found!");
                     Swal.fire({
                         icon: 'error',
-                        title: 'Data Pengguna Tidak Ditemukan',
-                        text: 'Silakan hubungi dukungan teknis.'
-                    }).then(() => router.push("/login"));
+                        title: 'User Data Not Found',
+                        text: 'Please contact technical support.'
+                    }).then(() => router.push("/"));
                 }
-            } else {
-                router.push("/login");
-            }
-        };
-        fetchUserData();
-    }, [authUser, router]);
-
-    // Load employees data
-    useEffect(() => {
-        const fetchEmployees = async () => {
-            try {
-                const querySnapshot = await getDocs(collection(db, "employees"));
-                const employeesData: Employee[] = [];
-                const deptSet = new Set<string>();
-
-                querySnapshot.forEach((doc) => {
-                    const data = doc.data() as Employee;
-                    employeesData.push({ ...data, id: doc.id });
-                    deptSet.add(data.dept);
-                });
-
-                setEmployees(employeesData);
-                setDepartments(Array.from(deptSet).sort());
             } catch (error) {
-                console.error("Error fetching employees:", error);
-                Swal.fire({
-                    icon: 'error',
-                    title: 'Gagal Memuat Data',
-                    text: 'Terjadi kesalahan saat mengambil data karyawan.'
-                });
+                console.error("Error fetching user data or pending approvals:", error);
+                router.push("/");
+            } finally {
+                setIsLoading(false);
             }
+        });
+        
+        // Fetch employees and departments data for the form
+        const fetchEmployeesAndDepts = async () => {
+          try {
+              const employeesSnapshot = await getDocs(collection(db, "employees"));
+              const employeesData: Employee[] = [];
+              const deptSet = new Set<string>();
+
+              employeesSnapshot.forEach((doc) => {
+                  const data = doc.data() as Employee;
+                  employeesData.push({ ...data, id: doc.id });
+                  deptSet.add(data.dept);
+              });
+              setEmployees(employeesData);
+              setDepartments(Array.from(deptSet).sort());
+          } catch (error) {
+              console.error("Error fetching employees:", error);
+              Swal.fire({
+                  icon: 'error',
+                  title: 'Failed to Load Data',
+                  text: 'An error occurred while fetching employee data.'
+              });
+          }
         };
-        fetchEmployees();
-    }, []);
+
+        fetchEmployeesAndDepts();
+        return () => unsubscribe();
+    }, [router]);
 
     // Filter employees by department
     useEffect(() => {
@@ -193,8 +212,8 @@ const OvertimeRequestPage: React.FC = () => {
         if (selectedEmployees.length === 0) {
             await Swal.fire({
                 icon: 'warning',
-                title: 'Peringatan',
-                text: 'Pilih minimal satu karyawan terlebih dahulu!'
+                title: 'Warning',
+                text: 'Please select at least one employee first!'
             });
             return;
         }
@@ -217,8 +236,8 @@ const OvertimeRequestPage: React.FC = () => {
         if (newEntries.length === 0) {
             await Swal.fire({
                 icon: 'info',
-                title: 'Informasi',
-                text: 'Semua karyawan yang dipilih sudah ada di daftar!'
+                title: 'Information',
+                text: 'All selected employees are already on the list!'
             });
             return;
         }
@@ -229,23 +248,36 @@ const OvertimeRequestPage: React.FC = () => {
 
     const removeOvertimeEntry = async (entryId: string) => {
         const result = await Swal.fire({
-            title: 'Hapus data ini?',
-            text: "Anda tidak bisa mengembalikan ini!",
+            title: 'Delete this data?',
+            text: "You will not be able to revert this!",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
             cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Ya, hapus!'
+            confirmButtonText: 'Yes, delete it!'
         });
         
         if (result.isConfirmed) {
             setOvertimeEntries(prev => prev.filter(entry => entry.id !== entryId));
             Swal.fire(
-                'Terhapus!',
-                'Data lembur telah dihapus.',
+                'Deleted!',
+                'Overtime data has been deleted.',
                 'success'
             );
         }
+    };
+
+    const handleLogout = async () => {
+        try {
+          await signOut(auth);
+          router.push("/");
+        } catch (error) {
+          console.error("Error signing out:", error);
+        }
+    };
+    
+    const handleSidebarToggle = () => {
+        setIsSidebarOpen(!isSidebarOpen);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -255,19 +287,19 @@ const OvertimeRequestPage: React.FC = () => {
         if (formData.jenisPengajuan === "untuk-anggota" && overtimeEntries.length === 0) {
             await Swal.fire({
                 icon: 'warning',
-                title: 'Peringatan',
-                text: 'Tambahkan minimal satu karyawan untuk diajukan overtime!'
+                title: 'Warning',
+                text: 'Add at least one employee for overtime submission!'
             });
             return;
         }
         
         const confirmationResult = await Swal.fire({
-            title: 'Apakah Anda yakin?',
-            text: 'Anda akan mengajukan formulir lembur ini. Pastikan semua data sudah benar.',
+            title: 'Are you sure?',
+            text: 'You are about to submit this overtime form. Make sure all data is correct.',
             icon: 'question',
             showCancelButton: true,
-            confirmButtonText: 'Ya, Ajukan!',
-            cancelButtonText: 'Batal',
+            confirmButtonText: 'Yes, Submit!',
+            cancelButtonText: 'Cancel',
             confirmButtonColor: '#4CAF50',
             cancelButtonColor: '#d33',
         });
@@ -329,8 +361,8 @@ const OvertimeRequestPage: React.FC = () => {
 
                 Swal.fire({
                     icon: 'success',
-                    title: 'Berhasil!',
-                    text: 'Form lembur berhasil diajukan.',
+                    title: 'Success!',
+                    text: 'Overtime form submitted successfully.',
                     timer: 2000,
                     showConfirmButton: false
                 }).then(() => {
@@ -341,8 +373,8 @@ const OvertimeRequestPage: React.FC = () => {
                 console.error("Error submitting form:", error);
                 Swal.fire({
                     icon: 'error',
-                    title: 'Terjadi Kesalahan',
-                    text: 'Terjadi kesalahan saat menyimpan form. Silakan coba lagi.'
+                    title: 'An Error Occurred',
+                    text: 'An error occurred while saving the form. Please try again.'
                 });
             } finally {
                 setIsSubmitting(false);
@@ -352,14 +384,18 @@ const OvertimeRequestPage: React.FC = () => {
 
     const totalAllHours = overtimeEntries.reduce((sum, entry) => sum + entry.totalJam, 0);
 
-    if (!userProfile) {
-        return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">Loading user data...</div>;
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-500"></div>
+            </div>
+        );
     }
-
+    
     return (
-        <div className="min-h-screen flex bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
+        <div className="min-h-screen flex flex-col md:flex-row bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
             {/* Sidebar */}
-            <div className="w-64 bg-white shadow-lg">
+            <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transition-transform duration-300 ease-in-out md:static md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className="p-4 border-b border-green-100">
                     <div className="flex items-center justify-center mb-4">
                         <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
@@ -371,21 +407,21 @@ const OvertimeRequestPage: React.FC = () => {
 
                 <nav className="p-4">
                     <div className="mb-2">
-                        <Link href="/forms" className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition mb-4">
+                        <Link href="/forms" className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition mb-4" onClick={() => setIsSidebarOpen(false)}>
                             <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                             </svg>
-                            Kembali ke Daftar Form
+                            Back to Forms List
                         </Link>
                     </div>
 
                     <div className="mb-6">
-                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Form Overtime</h2>
+                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Leave Form</h2>
                         <ul className="space-y-1">
                             <li>
                                 <div className="flex items-center p-2 rounded-lg bg-green-50 text-green-700 font-medium">
                                     <span className="mr-3">📝</span>
-                                    Isi Form
+                                    Fill Form
                                 </div>
                             </li>
                         </ul>
@@ -398,20 +434,24 @@ const OvertimeRequestPage: React.FC = () => {
                 {/* Header */}
                 <header className="bg-white shadow-sm border-b border-green-100">
                     <div className="flex items-center justify-between p-4">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Form Overtime Request</h1>
-                            <p className="text-sm text-gray-500">Ajukan lembur untuk diri sendiri atau anggota tim</p>
-                        </div>
-                        <div className="flex space-x-2">
-                            <button className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">
-                                Simpan Draft
+                        <div className="md:hidden">
+                            <button onClick={handleSidebarToggle} className="text-gray-500 hover:text-gray-700 focus:outline-none">
+                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                                </svg>
                             </button>
+                        </div>
+                        <h1 className="text-2xl font-bold text-gray-900">Overtime Request Form</h1>
+                        <div className="flex items-center space-x-4">
+                            <div className="text-right">
+                                <p className="font-medium text-gray-900">Hello, {userProfile?.nama}</p>
+                                <p className="text-sm text-gray-500 capitalize">{userProfile?.role}</p>
+                            </div>
                             <button
-                                onClick={handleSubmit}
-                                disabled={isSubmitting}
-                                className="px-4 py-2 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] disabled:opacity-50 transition"
+                                onClick={handleLogout}
+                                className="bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white py-2 px-4 rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] transition-all duration-200"
                             >
-                                {isSubmitting ? "Mengajukan..." : "Ajukan Sekarang"}
+                                Logout
                             </button>
                         </div>
                     </div>
@@ -421,9 +461,9 @@ const OvertimeRequestPage: React.FC = () => {
                 <main className="p-6">
                     <div className="bg-white rounded-xl shadow-md p-6 border border-green-100">
                         <form onSubmit={handleSubmit} className="space-y-6">
-                            {/* Jenis Pengajuan */}
+                            {/* Submission Type */}
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Jenis Pengajuan</h3>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Submission Type</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <label className="flex items-center p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-green-50 transition">
                                         <input
@@ -435,8 +475,8 @@ const OvertimeRequestPage: React.FC = () => {
                                             className="text-green-600 focus:ring-green-500"
                                         />
                                         <div className="ml-3">
-                                            <span className="block text-sm font-medium text-gray-900">Untuk Diri Sendiri</span>
-                                            <span className="block text-sm text-gray-500">Ajukan lembur untuk diri sendiri</span>
+                                            <span className="block text-sm font-medium text-gray-900">For Myself</span>
+                                            <span className="block text-sm text-gray-500">Submit overtime request for yourself</span>
                                         </div>
                                     </label>
 
@@ -450,20 +490,20 @@ const OvertimeRequestPage: React.FC = () => {
                                             className="text-green-600 focus:ring-green-500"
                                         />
                                         <div className="ml-3">
-                                            <span className="block text-sm font-medium text-gray-900">Untuk Anggota Tim</span>
-                                            <span className="block text-sm text-gray-500">Ajukan lembur untuk anggota tim/department</span>
+                                            <span className="block text-sm font-medium text-gray-900">For Team Members</span>
+                                            <span className="block text-sm text-gray-500">Submit overtime request for team/department members</span>
                                         </div>
                                     </label>
                                 </div>
                             </div>
 
-                            {/* Form untuk Diri Sendiri */}
+                            {/* Form for Self */}
                             {formData.jenisPengajuan === "diri-sendiri" && (
                                 <div>
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Detail Lembur</h3>
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Overtime Details</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Lembur</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Overtime Date</label>
                                             <input
                                                 type="date"
                                                 name="tanggal"
@@ -474,7 +514,7 @@ const OvertimeRequestPage: React.FC = () => {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Jam Mulai</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
                                             <input
                                                 type="time"
                                                 name="jamMulai"
@@ -485,7 +525,7 @@ const OvertimeRequestPage: React.FC = () => {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Jam Selesai</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
                                             <input
                                                 type="time"
                                                 name="jamSelesai"
@@ -503,17 +543,17 @@ const OvertimeRequestPage: React.FC = () => {
                                                 onChange={handleDefaultEntryChange}
                                                 className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                             >
-                                                <option value="0">Tidak ada break</option>
-                                                <option value="30">30 menit</option>
-                                                <option value="60">60 menit (1 jam)</option>
-                                                <option value="90">90 menit (1.5 jam)</option>
-                                                <option value="120">120 menit (2 jam)</option>
+                                                <option value="0">No break</option>
+                                                <option value="30">30 minutes</option>
+                                                <option value="60">60 minutes (1 hour)</option>
+                                                <option value="90">90 minutes (1.5 hours)</option>
+                                                <option value="120">120 minutes (2 hours)</option>
                                             </select>
                                         </div>
                                     </div>
                                     <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-6">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Total Jam Lembur</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Total Overtime Hours</label>
                                             <div className="relative">
                                                 <input
                                                     type="text"
@@ -521,41 +561,41 @@ const OvertimeRequestPage: React.FC = () => {
                                                     readOnly
                                                     className="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                 />
-                                                <span className="absolute right-3 top-2.5 text-gray-500">Jam</span>
+                                                <span className="absolute right-3 top-2.5 text-gray-500">Hours</span>
                                             </div>
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Kategori Lembur</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Overtime Category</label>
                                             <select
                                                 name="kategori"
                                                 value={formData.kategori}
                                                 onChange={handleChange}
                                                 className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                             >
-                                                <option value="reguler">Lembur Reguler</option>
-                                                <option value="weekend">Lembur Weekend</option>
-                                                <option value="holiday">Lembur Hari Libur</option>
+                                                <option value="reguler">Regular Overtime</option>
+                                                <option value="weekend">Weekend Overtime</option>
+                                                <option value="holiday">Holiday Overtime</option>
                                             </select>
                                         </div>
                                     </div>
                                 </div>
                             )}
 
-                            {/* Form untuk Anggota Tim */}
+                            {/* Form for Team Members */}
                             {formData.jenisPengajuan === "untuk-anggota" && (
                                 <div>
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Tambah Anggota Tim</h3>
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Team Members</h3>
                                     <div className="bg-gray-50 p-4 rounded-lg mb-6">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Filter Department</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Department</label>
                                                 <select
                                                     name="deptFilter"
                                                     value={formData.deptFilter}
                                                     onChange={handleChange}
                                                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                 >
-                                                    <option value="">Pilih Department</option>
+                                                    <option value="">Select Department</option>
                                                     {departments.map(dept => (
                                                         <option key={dept} value={dept}>{dept}</option>
                                                     ))}
@@ -564,9 +604,8 @@ const OvertimeRequestPage: React.FC = () => {
 
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Pilih Karyawan
+                                                    Select Employee
                                                 </label>
-
                                                 <div className="flex items-center mb-2">
                                                     <input
                                                         type="checkbox"
@@ -582,10 +621,9 @@ const OvertimeRequestPage: React.FC = () => {
                                                         className="mr-2"
                                                     />
                                                     <label htmlFor="selectAll" className="text-sm font-medium text-gray-700">
-                                                        Pilih Semua
+                                                        Select All
                                                     </label>
                                                 </div>
-
                                                 <div className="max-h-60 overflow-y-auto border rounded-lg p-2">
                                                     {filteredEmployees.map((emp) => (
                                                         <div key={emp.id} className="flex items-center mb-1">
@@ -615,7 +653,7 @@ const OvertimeRequestPage: React.FC = () => {
 
                                         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-4">
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Default</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Default Date</label>
                                                 <input
                                                     type="date"
                                                     name="tanggal"
@@ -625,7 +663,7 @@ const OvertimeRequestPage: React.FC = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Jam Mulai Default</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Default Start Time</label>
                                                 <input
                                                     type="time"
                                                     name="jamMulai"
@@ -635,7 +673,7 @@ const OvertimeRequestPage: React.FC = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Jam Selesai Default</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Default End Time</label>
                                                 <input
                                                     type="time"
                                                     name="jamSelesai"
@@ -645,22 +683,22 @@ const OvertimeRequestPage: React.FC = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Break Time Default</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Default Break Time</label>
                                                 <select
                                                     name="breakTime"
                                                     value={defaultEntry.breakTime}
                                                     onChange={handleDefaultEntryChange}
                                                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                 >
-                                                    <option value="0">Tidak ada break</option>
-                                                    <option value="30">30 menit</option>
-                                                    <option value="60">60 menit (1 jam)</option>
-                                                    <option value="90">90 menit (1.5 jam)</option>
-                                                    <option value="120">120 menit (2 jam)</option>
+                                                    <option value="0">No break</option>
+                                                    <option value="30">30 min</option>
+                                                    <option value="60">60 min (1 hr)</option>
+                                                    <option value="90">90 min (1.5 hrs)</option>
+                                                    <option value="120">120 min (2 hrs)</option>
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Total Jam Default</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Default Total Hours</label>
                                                 <div className="flex">
                                                     <input
                                                         type="text"
@@ -668,7 +706,7 @@ const OvertimeRequestPage: React.FC = () => {
                                                         readOnly
                                                         className="flex-1 p-2.5 border border-gray-300 rounded-l-lg bg-gray-50 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                     />
-                                                    <span className="bg-gray-200 px-3 flex items-center rounded-r-lg text-gray-500">Jam</span>
+                                                    <span className="bg-gray-200 px-3 flex items-center rounded-r-lg text-gray-500">Hours</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -679,17 +717,17 @@ const OvertimeRequestPage: React.FC = () => {
                                             disabled={selectedEmployees.length === 0}
                                             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                                         >
-                                            + Tambahkan {selectedEmployees.length > 0 ? `(${selectedEmployees.length} karyawan)` : ""}
+                                            + Add {selectedEmployees.length > 0 ? `(${selectedEmployees.length} employees)` : ""}
                                         </button>
                                     </div>
 
-                                    {/* Daftar Karyawan yang Sudah Ditambahkan */}
+                                    {/* List of Added Employees */}
                                     {overtimeEntries.length > 0 && (
                                         <div>
                                             <div className="flex justify-between items-center mb-4">
-                                                <h3 className="text-lg font-semibold text-gray-900">Daftar Lembur Anggota Tim</h3>
+                                                <h3 className="text-lg font-semibold text-gray-900">Team Member Overtime List</h3>
                                                 <div className="text-sm font-medium text-gray-700">
-                                                    Total: {totalAllHours.toFixed(1)} jam
+                                                    Total: {totalAllHours.toFixed(1)} hours
                                                 </div>
                                             </div>
 
@@ -697,15 +735,15 @@ const OvertimeRequestPage: React.FC = () => {
                                                 <table className="w-full table-auto">
                                                     <thead className="bg-gray-50">
                                                         <tr>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Nama</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Name</th>
                                                             <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">NIK</th>
                                                             <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Dept</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Tanggal</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Jam Mulai</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Jam Selesai</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Date</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Start Time</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">End Time</th>
                                                             <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Break</th>
                                                             <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Total</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Aksi</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Action</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-gray-200">
@@ -756,7 +794,7 @@ const OvertimeRequestPage: React.FC = () => {
                                                                     </select>
                                                                 </td>
                                                                 <td className="px-4 py-2 text-sm font-medium">
-                                                                    {entry.totalJam.toFixed(1)} jam
+                                                                    {entry.totalJam.toFixed(1)} hours
                                                                 </td>
                                                                 <td className="px-4 py-2 text-sm">
                                                                     <button
@@ -764,7 +802,7 @@ const OvertimeRequestPage: React.FC = () => {
                                                                         onClick={() => removeOvertimeEntry(entry.id)}
                                                                         className="text-red-600 hover:text-red-800"
                                                                     >
-                                                                        Hapus
+                                                                        Delete
                                                                     </button>
                                                                 </td>
                                                             </tr>
@@ -777,15 +815,15 @@ const OvertimeRequestPage: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Alasan Lembur */}
+                            {/* Overtime Reason */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Alasan Lembur</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Overtime Reason</label>
                                 <textarea
                                     name="alasan"
                                     value={formData.alasan}
                                     onChange={handleChange}
                                     rows={3}
-                                    placeholder="Jelaskan alasan mengapa perlu melakukan lembur"
+                                    placeholder="Explain the reason for overtime"
                                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                     required
                                 />
@@ -797,20 +835,20 @@ const OvertimeRequestPage: React.FC = () => {
                                     href="/forms"
                                     className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
                                 >
-                                    Batal
+                                    Cancel
                                 </Link>
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
                                     className="px-6 py-2.5 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] disabled:opacity-50 transition"
                                 >
-                                    {isSubmitting ? "Mengajukan..." : "Ajukan Overtime"}
+                                    {isSubmitting ? "Submitting..." : "Submit Overtime"}
                                 </button>
                             </div>
                         </form>
                     </div>
 
-                    {/* Informasi Section */}
+                    {/* Information Section */}
                     <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mt-6">
                         <div className="flex">
                             <div className="flex-shrink-0">
@@ -819,14 +857,14 @@ const OvertimeRequestPage: React.FC = () => {
                                 </svg>
                             </div>
                             <div className="ml-3">
-                                <h3 className="text-sm font-medium text-yellow-800">Informasi Penting</h3>
+                                <h3 className="text-sm font-medium text-yellow-800">Important Information</h3>
                                 <div className="mt-2 text-sm text-yellow-700">
                                     <ul className="list-disc list-inside space-y-1">
-                                        <li>Waktu break dibulatkan ke kelipatan 30 menit</li>
-                                        <li>Untuk anggota tim, setiap orang bisa memiliki jam lembur yang berbeda</li>
-                                        <li>Anda dapat mengedit jam lembur per individu setelah menambahkan karyawan</li>
-                                        <li>Pastikan lembur telah mendapatkan persetujuan atasan langsung</li>
-                                        <li>Form harus diajukan maksimal H+1 setelah lembur dilakukan</li>
+                                        <li>Break time is rounded to increments of 30 minutes</li>
+                                        <li>For team members, each person can have different overtime hours</li>
+                                        <li>You can edit the overtime hours per individual after adding the employee</li>
+                                        <li>Ensure overtime has been approved by the direct supervisor</li>
+                                        <li>The form must be submitted at the latest H+1 after the overtime is performed</li>
                                     </ul>
                                 </div>
                             </div>

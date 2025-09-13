@@ -54,6 +54,7 @@ const LeaveRecapitulationPage: React.FC = () => {
     const [departments, setDepartments] = useState<string[]>([]);
     const [deptIdToName, setDeptIdToName] = useState<Map<string, string>>(new Map());
     const [selectedDept, setSelectedDept] = useState<string>("");
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const router = useRouter();
 
     const safeToDate = (value: Timestamp | string): Date | null => {
@@ -202,7 +203,7 @@ const LeaveRecapitulationPage: React.FC = () => {
                     "No": no++,
                     "Form ID": form.id,
                     "Requester Name": form.requesterName,
-                    "Date Submitted": safeToDate(form.createdAt)?.toLocaleDateString('id-ID'),
+                    "Date Submitted": safeToDate(form.createdAt)?.toLocaleDateString('en-US'),
                     "Employee NIK": entry.employee.nik,
                     "Employee Name": entry.employee.nama,
                     "Employee Dept": entry.employee.dept,
@@ -251,8 +252,9 @@ const LeaveRecapitulationPage: React.FC = () => {
     let tableIndex = 0;
 
     return (
-        <div className="min-h-screen flex bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
-            <div className="w-64 bg-white shadow-lg">
+        <div className="min-h-screen flex flex-col lg:flex-row bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
+            {/* Sidebar */}
+            <div className={`fixed inset-y-0 left-0 w-64 bg-white shadow-lg z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 transition-transform duration-300 ease-in-out`}>
                 <div className="p-4 border-b border-green-100">
                     <div className="flex items-center justify-center mb-4">
                         <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
@@ -261,6 +263,7 @@ const LeaveRecapitulationPage: React.FC = () => {
                     </div>
                     <h1 className="text-lg font-bold text-center text-gray-800">Prestova One Approval</h1>
                 </div>
+
                 <nav className="p-4">
                     <div className="mb-6">
                         <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Main Menu</h2>
@@ -294,8 +297,8 @@ const LeaveRecapitulationPage: React.FC = () => {
                                         href="/admin/recapitulation"
                                         className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition"
                                     >
-                                        <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" className="w-5 h-5 mr-3">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                                        <svg fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-5 h-5 mr-3">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
                                         </svg>
                                         Back To List
                                     </Link>
@@ -305,10 +308,23 @@ const LeaveRecapitulationPage: React.FC = () => {
                     )}
                 </nav>
             </div>
+            {/* Main Content */}
             <div className="flex-1 overflow-auto">
+                {/* Header */}
                 <header className="bg-white shadow-sm border-b border-green-100">
                     <div className="flex items-center justify-between p-4">
-                        <h1 className="text-2xl font-bold text-gray-900">Leave Recapitulation</h1>
+                        <button
+                            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                            className="lg:hidden p-2 mr-2 rounded-md text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-green-500"
+                        >
+                            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
+                            </svg>
+                        </button>
+                        <div>
+                            <h1 className="text-xl md:text-2xl font-bold text-gray-900">Leave Recapitulation</h1>
+                            <p className="text-xs md:text-sm text-gray-500">View and export all leave data</p>
+                        </div>
                         <div className="flex items-center space-x-4">
                             <div className="text-right">
                                 <p className="font-medium text-gray-900">Hello, {user?.nama}</p>
@@ -317,6 +333,7 @@ const LeaveRecapitulationPage: React.FC = () => {
                         </div>
                     </div>
                 </header>
+                {/* Recapitulation Content */}
                 <main className="p-6">
                     <div className="bg-white rounded-xl shadow-md p-6 border border-green-100">
                         <h2 className="text-xl font-semibold text-gray-900 mb-4">Detailed Leave Data</h2>
@@ -348,7 +365,7 @@ const LeaveRecapitulationPage: React.FC = () => {
                                             <th className="py-3 px-4 text-sm font-semibold text-gray-600">NIK</th>
                                             <th className="py-3 px-4 text-sm font-semibold text-gray-600">Employee</th>
                                             <th className="py-3 px-4 text-sm font-semibold text-gray-600">Dept</th>
-                                            <th className="py-3 px-4 text-sm font-semibold text-gray-600">Jenis Cuti</th>
+                                            <th className="py-3 px-4 text-sm font-semibold text-gray-600">Leave Type</th>
                                             <th className="py-3 px-4 text-sm font-semibold text-gray-600">Start Date</th>
                                             <th className="py-3 px-4 text-sm font-semibold text-gray-600">End Date</th>
                                             <th className="py-3 px-4 text-sm font-semibold text-gray-600">Total Days</th>

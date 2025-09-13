@@ -4,32 +4,33 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-const AjukanFormPage: React.FC = () => {
+const FormsPage: React.FC = () => {
     const router = useRouter();
     const [activeCategory, setActiveCategory] = useState("all");
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const formCategories = [
-        { id: "all", name: "Semua Form", icon: "📋" },
-        { id: "attendance", name: "Kehadiran", icon: "⏰" },
-        { id: "leave", name: "Cuti & Izin", icon: "🏖️" },
-        { id: "financial", name: "Keuangan", icon: "💰" },
-        { id: "operation", name: "Operasional", icon: "🏢" },
-        { id: "hr", name: "SDM", icon: "👥" },
+        { id: "all", name: "All Forms", icon: "📋" },
+        { id: "attendance", name: "Attendance", icon: "⏰" },
+        { id: "leave", name: "Leave & Permission", icon: "🏖️" },
+        { id: "financial", name: "Financial", icon: "💰" },
+        { id: "operation", name: "Operational", icon: "🏢" },
+        { id: "hr", name: "HR", icon: "👥" },
     ];
 
     const formsList = [
         {
             id: 1,
             name: "Overtime Request",
-            description: "Ajukan lembur dengan detail waktu dan tugas",
+            description: "Submit overtime details with time and tasks",
             category: "attendance",
             icon: "🌙",
             url: "/forms/overtime",
         },
         {
             id: 2,
-            name: "Cuti Tahunan",
-            description: "Ajukan cuti tahunan dengan periode tertentu",
+            name: "Annual Leave",
+            description: "Submit annual leave request for a specific period",
             category: "leave",
             icon: "📅",
             url: "/forms/cuti",
@@ -37,7 +38,7 @@ const AjukanFormPage: React.FC = () => {
         {
             id: 3,
             name: "Purchase Order",
-            description: "Permintaan pembelian barang atau jasa",
+            description: "Request for purchasing goods or services",
             category: "financial",
             icon: "🛒",
             url: "/forms/purchase",
@@ -45,15 +46,15 @@ const AjukanFormPage: React.FC = () => {
         {
             id: 4,
             name: "Labor Request",
-            description: "Permintaan tenaga kerja tambahan",
+            description: "Request for additional labor",
             category: "hr",
             icon: "👷",
             url: "/forms/labor",
         },
         {
             id: 5,
-            name: "Surat Izin Keluar",
-            description: "Izin keluar kantor selama jam kerja",
+            name: "Permission to Leave",
+            description: "Permission to leave the office during work hours",
             category: "attendance",
             icon: "🚪",
             url: "/forms/keluar",
@@ -61,15 +62,15 @@ const AjukanFormPage: React.FC = () => {
         {
             id: 6,
             name: "Missed Punch",
-            description: "Lapor jika lupa absen masuk atau pulang",
+            description: "Report if you forgot to check-in or check-out",
             category: "attendance",
             icon: "🕗",
             url: "/forms/missedpunch",
         },
         {
             id: 7,
-            name: "Cuti Sakit",
-            description: "Ajukan cuti karena sakit dengan lampiran",
+            name: "Sick Leave",
+            description: "Submit sick leave request with attachments",
             category: "leave",
             icon: "❤️",
             url: "/forms/sakit",
@@ -77,7 +78,7 @@ const AjukanFormPage: React.FC = () => {
         {
             id: 8,
             name: "Advance Payment",
-            description: "Pengajuan Reimburse",
+            description: "Reimbursement submission",
             category: "financial",
             icon: "💳",
             url: "/forms/payment",
@@ -85,7 +86,7 @@ const AjukanFormPage: React.FC = () => {
         {
             id: 9,
             name: "Resign Request",
-            description: "Pengajuan pengunduran diri",
+            description: "Resignation submission",
             category: "hr",
             icon: "👋",
             url: "/forms/resign",
@@ -96,36 +97,77 @@ const AjukanFormPage: React.FC = () => {
         ? formsList
         : formsList.filter(form => form.category === activeCategory);
 
+    const handleSidebarToggle = () => {
+        setIsSidebarOpen(!isSidebarOpen);
+    };
+
     return (
-        <div className="min-h-screen flex bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
-            {/* CSS untuk mengatur placeholder dan input text */}
+        <div className="min-h-screen flex flex-col md:flex-row bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
+            {/* CSS for placeholder and input text */}
             <style jsx>{`
-        /* Placeholder yang sedikit pudar */
-        input::placeholder {
-          color: #9ca3af; /* Abu-abu medium */
-          font-weight: 400;
-          opacity: 0.8;
-        }
-        
-        /* Teks input yang lebih gelap/terang ketika diketik */
-        input:not(:placeholder-shown) {
-          color: #1f2937; /* Hampir hitam */
-          font-weight: 500;
-        }
-        
-        /* Untuk browser tertentu */
-        input:-ms-input-placeholder {
-          color: #9ca3af;
-          font-weight: 400;
-        }
-        
-        input::-ms-input-placeholder {
-          color: #9ca3af;
-          font-weight: 400;
-        }
-      `}</style>
-            {/* Sidebar */}
-            <div className="w-64 bg-white shadow-lg">
+                /* Slightly faded placeholder */
+                input::placeholder {
+                    color: #9ca3af; /* Medium gray */
+                    font-weight: 400;
+                    opacity: 0.8;
+                }
+
+                /* Darker input text when typed */
+                input:not(:placeholder-shown) {
+                    color: #1f2937; /* Almost black */
+                    font-weight: 500;
+                }
+            `}</style>
+            
+            {/* Sidebar - Mobile View */}
+            <div className={`fixed inset-y-0 left-0 z-50 md:hidden bg-white shadow-lg w-64 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out`}>
+                <div className="p-4 border-b border-green-100 flex justify-end">
+                    <button onClick={handleSidebarToggle} className="text-gray-500 hover:text-gray-700 focus:outline-none">
+                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div className="p-4 border-b border-green-100 text-center">
+                    <div className="flex items-center justify-center mb-4">
+                        <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
+                            <span className="text-white font-bold text-xl">POA</span>
+                        </div>
+                    </div>
+                    <h1 className="text-lg font-bold text-center text-gray-800">Prestova One Approval</h1>
+                </div>
+                <nav className="p-4">
+                    <ul className="space-y-2">
+                        <li>
+                            <Link href="/dashboard" onClick={handleSidebarToggle} className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
+                                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                                </svg>
+                                Back to Dashboard
+                            </Link>
+                        </li>
+                    </ul>
+                    <div className="mt-6">
+                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Form Categories</h2>
+                        <ul className="space-y-1">
+                            {formCategories.map(category => (
+                                <li key={category.id}>
+                                    <button
+                                        onClick={() => { setActiveCategory(category.id); handleSidebarToggle(); }}
+                                        className={`w-full flex items-center p-2 rounded-lg text-left transition ${activeCategory === category.id ? 'bg-green-100 text-green-700 font-medium' : 'text-gray-700 hover:bg-green-50 hover:text-green-700'}`}
+                                    >
+                                        <span className="mr-3 text-lg">{category.icon}</span>
+                                        {category.name}
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </nav>
+            </div>
+
+            {/* Sidebar - Desktop View */}
+            <div className="hidden md:block w-64 bg-white shadow-lg">
                 <div className="p-4 border-b border-green-100">
                     <div className="flex items-center justify-center mb-4">
                         <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
@@ -141,12 +183,12 @@ const AjukanFormPage: React.FC = () => {
                             <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                             </svg>
-                            Kembali ke Dashboard
+                            Back to Dashboard
                         </Link>
                     </div>
 
                     <div className="mb-6">
-                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Kategori Form</h2>
+                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Form Categories</h2>
                         <ul className="space-y-1">
                             {formCategories.map(category => (
                                 <li key={category.id}>
@@ -169,36 +211,27 @@ const AjukanFormPage: React.FC = () => {
                 {/* Header */}
                 <header className="bg-white shadow-sm border-b border-green-100">
                     <div className="flex items-center justify-between p-4">
+                        <div className="md:hidden">
+                            <button onClick={handleSidebarToggle} className="text-gray-500 hover:text-gray-700 focus:outline-none">
+                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                                </svg>
+                            </button>
+                        </div>
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Ajukan Form</h1>
-                            <p className="text-sm text-gray-500">Pilih jenis form yang ingin diajukan</p>
+                            <h1 className="text-2xl font-bold text-gray-900">Submit a Form</h1>
+                            <p className="text-sm text-gray-500">Choose the type of form you want to submit</p>
                         </div>
                     </div>
                 </header>
 
                 {/* Main Content */}
-                <main className="p-6">
-                    {/* Search Box
-                    <div className="mb-6">
-                        <div className="relative max-w-md">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-                                </svg>
-                            </div>
-                            <input
-                                type="text"
-                                placeholder="Cari form..."
-                                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
-                            />
-                        </div>
-                    </div> */}
-
+                <main className="p-4 md:p-6">
                     {/* Forms Grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                         {filteredForms.map(form => (
                             <Link key={form.id} href={form.url}>
-                                <div className="bg-white rounded-xl shadow-md p-6 border border-green-100 hover:shadow-lg transition-shadow cursor-pointer h-full">
+                                <div className="bg-white rounded-xl shadow-md p-4 md:p-6 border border-green-100 hover:shadow-lg transition-shadow cursor-pointer h-full">
                                     <div className="flex items-start mb-4">
                                         <span className="text-3xl mr-4">{form.icon}</span>
                                         <div>
@@ -211,7 +244,7 @@ const AjukanFormPage: React.FC = () => {
                                             {formCategories.find(cat => cat.id === form.category)?.name}
                                         </span>
                                         <span className="text-green-600 font-medium text-sm flex items-center">
-                                            Ajukan
+                                            Submit
                                             <svg className="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
                                             </svg>
@@ -230,8 +263,8 @@ const AjukanFormPage: React.FC = () => {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
                             </div>
-                            <h3 className="text-lg font-medium text-gray-900 mb-2">Tidak ada form ditemukan</h3>
-                            <p className="text-gray-500">Coba pilih kategori lain atau gunakan kata kunci pencarian berbeda</p>
+                            <h3 className="text-lg font-medium text-gray-900 mb-2">No forms found</h3>
+                            <p className="text-gray-500">Try selecting another category or using a different search keyword</p>
                         </div>
                     )}
                 </main>
@@ -240,4 +273,4 @@ const AjukanFormPage: React.FC = () => {
     );
 };
 
-export default AjukanFormPage;
+export default FormsPage;

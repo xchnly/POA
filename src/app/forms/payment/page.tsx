@@ -7,7 +7,7 @@ import { auth, db } from "@/lib/firebase";
 import { doc, setDoc, serverTimestamp, getDoc } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { v4 as uuidv4 } from 'uuid';
-import Swal from 'sweetalert2'; // Tambahkan import SweetAlert2
+import Swal from 'sweetalert2';
 
 // --- Interfaces ---
 interface UserData {
@@ -27,15 +27,16 @@ interface ReimbursementItem {
     deskripsi: string;
 }
 
-// --- Komponen Halaman ---
+// --- Page Component ---
 const PaymentRequestPage: React.FC = () => {
     const router = useRouter();
     const [authUser] = useAuthState(auth);
     const [userProfile, setUserProfile] = useState<UserData | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [reimbursementItems, setReimbursementItems] = useState<ReimbursementItem[]>([]);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     
-    // State untuk detail bank, alasan, dan file nota
+    // State for bank details, reason, and receipt files
     const [formData, setFormData] = useState({
         alasan: "",
         namaBank: "",
@@ -46,7 +47,7 @@ const PaymentRequestPage: React.FC = () => {
     const [notaFileInputs, setNotaFileInputs] = useState<string[]>(['']);
     const [deptName, setDeptName] = useState<string | null>(null);
 
-    // --- Efek samping untuk mengambil data pengguna ---
+    // --- Side effect to fetch user data ---
     useEffect(() => {
         const fetchUserData = async () => {
             if (authUser) {
@@ -72,7 +73,7 @@ const PaymentRequestPage: React.FC = () => {
         fetchUserData();
     }, [authUser, router]);
     
-    // --- Efek samping untuk mengambil nama departemen ---
+    // --- Side effect to fetch department name ---
     useEffect(() => {
         const fetchDeptName = async () => {
             if (userProfile?.dept) {
@@ -86,7 +87,7 @@ const PaymentRequestPage: React.FC = () => {
         fetchDeptName();
     }, [userProfile?.dept]);
 
-    // --- Fungsi Unggah File ke Cloudinary ---
+    // --- Function to upload file to Cloudinary ---
     const uploadFileToCloudinary = async (file: File) => {
         const CLOUD_NAME = "due6kqddl";
         const UPLOAD_PRESET = "sick_leave_preset";
@@ -103,7 +104,7 @@ const PaymentRequestPage: React.FC = () => {
         return data.secure_url;
     };
 
-    // --- Logika Form ---
+    // --- Form Logic ---
     const handleAddItem = () => {
         setReimbursementItems([...reimbursementItems, {
             id: uuidv4(),
@@ -115,19 +116,19 @@ const PaymentRequestPage: React.FC = () => {
 
     const handleRemoveItem = (id: string) => {
         Swal.fire({
-            title: 'Hapus item ini?',
-            text: "Anda tidak bisa mengembalikan ini!",
+            title: 'Delete this item?',
+            text: "You won't be able to revert this!",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
             cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Ya, hapus!'
+            confirmButtonText: 'Yes, delete it!'
         }).then((result) => {
             if (result.isConfirmed) {
                 setReimbursementItems(reimbursementItems.filter(item => item.id !== id));
                 Swal.fire(
-                    'Terhapus!',
-                    'Item reimbursement telah dihapus.',
+                    'Deleted!',
+                    'The reimbursement item has been deleted.',
                     'success'
                 );
             }
@@ -162,34 +163,34 @@ const PaymentRequestPage: React.FC = () => {
 
     const handleRemoveNotaInput = (index: number) => {
         Swal.fire({
-            title: 'Hapus nota ini?',
-            text: "Anda tidak bisa mengembalikan ini!",
+            title: 'Delete this receipt?',
+            text: "You won't be able to revert this!",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
             cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Ya, hapus!'
+            confirmButtonText: 'Yes, delete it!'
         }).then((result) => {
             if (result.isConfirmed) {
                 setNotaFileInputs(prev => prev.filter((_, i) => i !== index));
                 setNotaFiles(prev => prev.filter((_, i) => i !== index));
                 Swal.fire(
-                    'Terhapus!',
-                    'Nota telah dihapus.',
+                    'Deleted!',
+                    'The receipt has been deleted.',
                     'success'
                 );
             }
         });
     };
 
-    // --- Fungsi Utama untuk Submit ---
+    // --- Main Submit Function ---
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!userProfile) {
             await Swal.fire({
                 icon: 'error',
                 title: 'Error',
-                text: 'Profil pengguna belum dimuat. Silakan coba lagi.'
+                text: 'User profile not loaded yet. Please try again.'
             });
             return;
         }
@@ -197,8 +198,8 @@ const PaymentRequestPage: React.FC = () => {
         if (reimbursementItems.length === 0) {
             await Swal.fire({
                 icon: 'warning',
-                title: 'Peringatan',
-                text: 'Harap tambahkan minimal satu item pembayaran!'
+                title: 'Warning',
+                text: 'Please add at least one payment item!'
             });
             return;
         }
@@ -210,8 +211,8 @@ const PaymentRequestPage: React.FC = () => {
         if (hasMissingItemInfo) {
             await Swal.fire({
                 icon: 'warning',
-                title: 'Peringatan',
-                text: 'Pastikan semua item memiliki nama dan harga.'
+                title: 'Warning',
+                text: 'Make sure all items have a name and price.'
             });
             return;
         }
@@ -219,8 +220,8 @@ const PaymentRequestPage: React.FC = () => {
         if (notaFiles.length === 0 || notaFiles.some(file => !file)) {
             await Swal.fire({
                  icon: 'warning',
-                 title: 'Peringatan',
-                 text: 'Harap unggah minimal satu nota untuk pengajuan ini.'
+                 title: 'Warning',
+                 text: 'Please upload at least one receipt for this submission.'
             });
             return;
         }
@@ -228,19 +229,19 @@ const PaymentRequestPage: React.FC = () => {
         if (!formData.namaBank || !formData.nomorRekening || !formData.atasNamaRekening) {
             await Swal.fire({
                 icon: 'warning',
-                title: 'Peringatan',
-                text: 'Harap lengkapi detail rekening bank untuk pencairan dana.'
+                title: 'Warning',
+                text: 'Please complete the bank account details for fund disbursement.'
             });
             return;
         }
 
         const confirmationResult = await Swal.fire({
-            title: 'Ajukan Reimbursement?',
-            text: 'Anda akan mengirimkan formulir ini. Pastikan semua data sudah benar.',
+            title: 'Submit Reimbursement?',
+            text: 'You are about to submit this form. Make sure all data is correct.',
             icon: 'question',
             showCancelButton: true,
-            confirmButtonText: 'Ya, Ajukan!',
-            cancelButtonText: 'Batal',
+            confirmButtonText: 'Yes, Submit!',
+            cancelButtonText: 'Cancel',
             confirmButtonColor: '#4CAF50',
             cancelButtonColor: '#d33',
         });
@@ -251,7 +252,7 @@ const PaymentRequestPage: React.FC = () => {
             try {
                 const formId = `reimburse-${Date.now()}`;
                 
-                // Unggah semua file nota
+                // Upload all receipt files
                 const notaUrls = await Promise.all(
                     notaFiles.map(file => uploadFileToCloudinary(file))
                 );
@@ -272,7 +273,7 @@ const PaymentRequestPage: React.FC = () => {
                     status: "pending",
                     requesterUid: userProfile.uid || '',
                     requesterName: userProfile.nama || '',
-                    deptId: userProfile.dept || '', // Menggunakan 'dept' dari profil pengguna
+                    deptId: userProfile.dept || '',
                     createdAt: serverTimestamp(),
                     updatedAt: serverTimestamp(),
                 };
@@ -281,8 +282,8 @@ const PaymentRequestPage: React.FC = () => {
 
                 await Swal.fire({
                     icon: 'success',
-                    title: 'Berhasil!',
-                    text: 'Form reimbursement berhasil diajukan.',
+                    title: 'Success!',
+                    text: 'Reimbursement form submitted successfully.',
                     timer: 2000,
                     showConfirmButton: false
                 });
@@ -293,8 +294,8 @@ const PaymentRequestPage: React.FC = () => {
                 console.error("Error submitting form:", error);
                 await Swal.fire({
                     icon: 'error',
-                    title: 'Terjadi Kesalahan',
-                    text: 'Terjadi kesalahan saat menyimpan form. Silakan coba lagi.'
+                    title: 'An Error Occurred',
+                    text: 'An error occurred while saving the form. Please try again.'
                 });
             } finally {
                 setIsSubmitting(false);
@@ -308,11 +309,11 @@ const PaymentRequestPage: React.FC = () => {
 
     const totalHarga = reimbursementItems.reduce((sum, item) => sum + item.harga, 0);
 
-    // --- Struktur JSX (Halaman Form) ---
+    // --- JSX Structure (Form Page) ---
     return (
-        <div className="min-h-screen flex bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
+        <div className="min-h-screen flex flex-col lg:flex-row bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
             {/* Sidebar */}
-            <div className="w-64 bg-white shadow-lg">
+            <div className={`fixed inset-y-0 left-0 w-64 bg-white shadow-lg z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 transition-transform duration-300 ease-in-out`}>
                 <div className="p-4 border-b border-green-100">
                     <div className="flex items-center justify-center mb-4">
                         <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
@@ -328,16 +329,16 @@ const PaymentRequestPage: React.FC = () => {
                             <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                             </svg>
-                            Kembali ke Daftar Form
+                            Back to Forms List
                         </Link>
                     </div>
                     <div className="mb-6">
-                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Form Reimburse</h2>
+                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Reimbursement Form</h2>
                         <ul className="space-y-1">
                             <li>
                                 <div className="flex items-center p-2 rounded-lg bg-green-50 text-green-700 font-medium">
                                     <span className="mr-3">📝</span>
-                                    Isi Form
+                                    Fill Form
                                 </div>
                             </li>
                         </ul>
@@ -348,11 +349,21 @@ const PaymentRequestPage: React.FC = () => {
             {/* Main Content */}
             <div className="flex-1 overflow-auto">
                 {/* Header */}
-                <header className="bg-white shadow-sm border-b border-green-100">
-                    <div className="flex items-center justify-between p-4">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Form Reimbursement</h1>
-                            <p className="text-sm text-gray-500">Ajukan reimbursement dengan melampirkan nota</p>
+                <header className="bg-white shadow-sm border-b border-green-100 p-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                             <button
+                                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                                className="lg:hidden p-2 mr-2 rounded-md text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-green-500"
+                            >
+                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
+                                </svg>
+                            </button>
+                            <div>
+                                <h1 className="text-xl md:text-2xl font-bold text-gray-900">Reimbursement Form</h1>
+                                <p className="text-xs md:text-sm text-gray-500">Submit a reimbursement request by attaching receipts</p>
+                            </div>
                         </div>
                         <div className="flex space-x-2">
                             <button
@@ -360,23 +371,23 @@ const PaymentRequestPage: React.FC = () => {
                                 disabled={isSubmitting}
                                 className="px-4 py-2 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] disabled:opacity-50 transition"
                             >
-                                {isSubmitting ? "Mengajukan..." : "Ajukan Sekarang"}
+                                {isSubmitting ? "Submitting..." : "Submit Now"}
                             </button>
                         </div>
                     </div>
                 </header>
 
                 {/* Main Content */}
-                <main className="p-6">
-                    <div className="bg-white rounded-xl shadow-md p-6 border border-green-100">
+                <main className="p-4 md:p-6">
+                    <div className="bg-white rounded-xl shadow-md p-4 md:p-6 border border-green-100">
                         <form onSubmit={handleSubmit} className="space-y-6">
 
                             {/* Requester Information */}
                             <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                <h3 className="text-lg font-semibold text-gray-900 mb-2">Informasi Pengaju</h3>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-2">Requester Information</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
-                                        <p className="text-sm font-medium text-gray-700">Nama</p>
+                                        <p className="text-sm font-medium text-gray-700">Name</p>
                                         <p className="mt-1 text-sm text-gray-900">{userProfile.nama}</p>
                                     </div>
                                     <div>
@@ -384,33 +395,33 @@ const PaymentRequestPage: React.FC = () => {
                                         <p className="mt-1 text-sm text-gray-900">{userProfile.nik}</p>
                                     </div>
                                     <div>
-                                        <p className="text-sm font-medium text-gray-700">Departemen</p>
-                                        <p className="mt-1 text-sm text-gray-900">{deptName || 'Memuat...'}</p>
+                                        <p className="text-sm font-medium text-gray-700">Department</p>
+                                        <p className="mt-1 text-sm text-gray-900">{deptName || 'Loading...'}</p>
                                     </div>
                                 </div>
                             </div>
                             
-                            {/* Keterangan Form */}
+                            {/* Form Description */}
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-2">Keterangan Umum</h3>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Alasan Pengajuan</label>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-2">General Information</h3>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Submission</label>
                                 <textarea
                                     name="alasan"
                                     value={formData.alasan}
                                     onChange={handleFormChange}
                                     rows={3}
-                                    placeholder="Jelaskan alasan pengajuan reimbursement ini"
+                                    placeholder="Explain the reason for this reimbursement request"
                                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                     required
                                 />
                             </div>
 
-                            {/* Detail Rekening Bank */}
+                            {/* Bank Account Details */}
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-2">Detail Rekening Pencairan Dana</h3>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-2">Fund Disbursement Bank Account Details</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Nama Bank</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Bank Name</label>
                                         <input
                                             type="text"
                                             name="namaBank"
@@ -421,7 +432,7 @@ const PaymentRequestPage: React.FC = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Rekening</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Account Number</label>
                                         <input
                                             type="text"
                                             name="nomorRekening"
@@ -432,7 +443,7 @@ const PaymentRequestPage: React.FC = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Atas Nama Rekening</label>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Account Holder Name</label>
                                         <input
                                             type="text"
                                             name="atasNamaRekening"
@@ -445,16 +456,16 @@ const PaymentRequestPage: React.FC = () => {
                                 </div>
                             </div>
 
-                            {/* Daftar Item Reimbursement */}
+                            {/* Reimbursement Item List */}
                             <div>
                                 <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-lg font-semibold text-gray-900">Daftar Item Reimbursement</h3>
+                                    <h3 className="text-lg font-semibold text-gray-900">Reimbursement Item List</h3>
                                     <button
                                         type="button"
                                         onClick={handleAddItem}
                                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
                                     >
-                                        + Tambah Item
+                                        + Add Item
                                     </button>
                                 </div>
 
@@ -475,7 +486,7 @@ const PaymentRequestPage: React.FC = () => {
                                             <h4 className="font-semibold text-gray-800 mb-2">Item #{index + 1}</h4>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Keterangan Barang</label>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Item Description</label>
                                                     <input
                                                         type="text"
                                                         value={item.namaItem}
@@ -485,7 +496,7 @@ const PaymentRequestPage: React.FC = () => {
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Harga (Rp)</label>
+                                                    <label className="block text-sm font-medium text-gray-700 mb-1">Price (Rp)</label>
                                                     <input
                                                         type="number"
                                                         value={item.harga}
@@ -497,12 +508,12 @@ const PaymentRequestPage: React.FC = () => {
                                                 </div>
                                             </div>
                                             <div className="mt-4">
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Deskripsi</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
                                                 <input
                                                     type="text"
                                                     value={item.deskripsi}
                                                     onChange={(e) => handleItemChange(item.id, 'deskripsi', e.target.value)}
-                                                    placeholder="Contoh: Biaya makan siang tim"
+                                                    placeholder="Example: Team lunch expenses"
                                                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 transition"
                                                 />
                                             </div>
@@ -511,16 +522,16 @@ const PaymentRequestPage: React.FC = () => {
                                 </div>
                             </div>
                             
-                            {/* Daftar Nota */}
+                            {/* Receipt List */}
                             <div>
                                 <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-lg font-semibold text-gray-900">Unggah Nota (Wajib)</h3>
+                                    <h3 className="text-lg font-semibold text-gray-900">Upload Receipts (Mandatory)</h3>
                                     <button
                                         type="button"
                                         onClick={handleAddNotaInput}
                                         className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
                                     >
-                                        + Tambah Nota Lainnya
+                                        + Add Another Receipt
                                     </button>
                                 </div>
                                 <div className="space-y-4">
@@ -539,7 +550,7 @@ const PaymentRequestPage: React.FC = () => {
                                                     </button>
                                                 </div>
                                             )}
-                                            <h4 className="font-semibold text-gray-800 mb-2">Nota #{index + 1}</h4>
+                                            <h4 className="font-semibold text-gray-800 mb-2">Receipt #{index + 1}</h4>
                                             <input
                                                 type="file"
                                                 accept=".pdf, .jpg, .jpeg, .png"
@@ -548,16 +559,16 @@ const PaymentRequestPage: React.FC = () => {
                                                 required
                                             />
                                             {notaFiles[index] && (
-                                                <p className="mt-2 text-sm text-gray-600">File terpilih: {notaFiles[index].name}</p>
+                                                <p className="mt-2 text-sm text-gray-600">Selected file: {notaFiles[index].name}</p>
                                             )}
                                         </div>
                                     ))}
                                 </div>
                             </div>
 
-                            {/* Total Harga */}
+                            {/* Total Price */}
                             <div className="text-right pt-4 border-t border-gray-200">
-                                <h4 className="text-lg font-bold text-gray-900">Total Biaya: Rp {totalHarga.toLocaleString('id-ID')}</h4>
+                                <h4 className="text-lg font-bold text-gray-900">Total Cost: Rp {totalHarga.toLocaleString('id-ID')}</h4>
                             </div>
 
                             {/* Action Buttons */}
@@ -566,20 +577,20 @@ const PaymentRequestPage: React.FC = () => {
                                     href="/forms"
                                     className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
                                 >
-                                    Batal
+                                    Cancel
                                 </Link>
                                 <button
                                     type="submit"
                                     disabled={isSubmitting || reimbursementItems.length === 0 || notaFiles.length === 0 || notaFiles.some(file => !file)}
                                     className="px-6 py-2.5 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] disabled:opacity-50 transition"
                                 >
-                                    {isSubmitting ? "Mengajukan..." : "Ajukan Reimbursement"}
+                                    {isSubmitting ? "Submitting..." : "Submit Reimbursement"}
                                 </button>
                             </div>
                         </form>
                     </div>
 
-                    {/* Informasi Section */}
+                    {/* Information Section */}
                     <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mt-6">
                         <div className="flex">
                             <div className="flex-shrink-0">
@@ -588,13 +599,13 @@ const PaymentRequestPage: React.FC = () => {
                                 </svg>
                             </div>
                             <div className="ml-3">
-                                <h3 className="text-sm font-medium text-yellow-800">Informasi Penting</h3>
+                                <h3 className="text-sm font-medium text-yellow-800">Important Information</h3>
                                 <div className="mt-2 text-sm text-yellow-700">
                                     <ul className="list-disc list-inside space-y-1">
-                                        <li>Form ini digunakan untuk mengajukan reimbursement atau pembayaran.</li>
-                                        <li>Anda dapat menambahkan lebih dari satu item pengeluaran.</li>
-                                        <li>Wajib mengunggah minimal satu nota/bukti pembayaran untuk pengajuan ini.</li>
-                                        <li>Pastikan nota yang diunggah dapat terbaca dengan jelas.</li>
+                                        <li>This form is used to request reimbursement or payment.</li>
+                                        <li>You can add more than one expense item.</li>
+                                        <li>It is mandatory to upload at least one receipt/proof of payment for this submission.</li>
+                                        <li>Ensure the uploaded receipt is clearly legible.</li>
                                     </ul>
                                 </div>
                             </div>

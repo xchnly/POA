@@ -4,9 +4,9 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
-import { 
+import {
   doc, setDoc, getDocs, collection, deleteDoc, updateDoc,
-  serverTimestamp, query, where, orderBy, writeBatch 
+  serverTimestamp, query, where, orderBy, writeBatch
 } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
 import * as XLSX from "xlsx";
@@ -46,6 +46,7 @@ const ManagementPage: React.FC = () => {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     nik: "",
@@ -67,20 +68,20 @@ const ManagementPage: React.FC = () => {
   // Filter employees based on search and department filter
   useEffect(() => {
     let filtered = employees;
-    
+
     if (searchTerm) {
-      filtered = filtered.filter(emp => 
+      filtered = filtered.filter(emp =>
         emp.nama.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.nik.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.telepon.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-    
+
     if (deptFilter) {
       filtered = filtered.filter(emp => emp.dept === deptFilter);
     }
-    
+
     setFilteredEmployees(filtered);
   }, [employees, searchTerm, deptFilter]);
 
@@ -89,16 +90,16 @@ const ManagementPage: React.FC = () => {
       const querySnapshot = await getDocs(
         query(collection(db, "employees"), orderBy("nama"))
       );
-      
+
       const employeesData: Employee[] = [];
       const deptSet = new Set<string>();
-      
+
       querySnapshot.forEach((doc) => {
         const data = doc.data() as Employee;
         employeesData.push({ ...data, id: doc.id });
         deptSet.add(data.dept);
       });
-      
+
       setEmployees(employeesData);
       setIsLoading(false);
     } catch (error) {
@@ -112,13 +113,13 @@ const ManagementPage: React.FC = () => {
       const querySnapshot = await getDocs(collection(db, "departments"));
       const departmentsData: Department[] = [];
       const deptNames: string[] = [];
-      
+
       querySnapshot.forEach((doc) => {
         const data = doc.data();
         departmentsData.push({ id: doc.id, name: data.name });
         deptNames.push(data.name);
       });
-      
+
       setDepartments(departmentsData);
       setDepartmentNames(deptNames.sort());
     } catch (error) {
@@ -133,33 +134,33 @@ const ManagementPage: React.FC = () => {
 
   const validateForm = () => {
     if (!formData.nik.trim()) {
-      alert("NIK harus diisi!");
+      alert("NIK is required!");
       return false;
     }
     if (!formData.nama.trim()) {
-      alert("Nama harus diisi!");
+      alert("Name is required!");
       return false;
     }
     if (!formData.dept.trim()) {
-      alert("Department harus diisi!");
+      alert("Department is required!");
       return false;
     }
     if (!formData.jabatan.trim()) {
-      alert("Jabatan harus diisi!");
+      alert("Position is required!");
       return false;
     }
     if (!formData.email.trim()) {
-      alert("Email harus diisi!");
+      alert("Email is required!");
       return false;
     }
     if (!formData.telepon.trim()) {
-      alert("Nomor telepon harus diisi!");
+      alert("Phone number is required!");
       return false;
     }
 
     // Validasi department harus sesuai dengan yang sudah ada
     if (!departmentNames.includes(formData.dept)) {
-      alert(`Department "${formData.dept}" tidak terdaftar. Silakan pilih department yang sudah ada.`);
+      alert(`Department "${formData.dept}" is not listed. Please choose an existing department.`);
       return false;
     }
 
@@ -168,9 +169,9 @@ const ManagementPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!validateForm()) return;
-    
+
     try {
       if (editingEmployee) {
         // Update existing employee
@@ -185,26 +186,26 @@ const ManagementPage: React.FC = () => {
           status: formData.status,
           updatedAt: serverTimestamp()
         });
-        alert("Data karyawan berhasil diupdate!");
+        alert("Employee data updated successfully!");
       } else {
         // Check if NIK already exists
         const nikQuery = query(collection(db, "employees"), where("nik", "==", formData.nik));
         const nikSnapshot = await getDocs(nikQuery);
-        
+
         if (!nikSnapshot.empty) {
-          alert("NIK sudah terdaftar! Gunakan NIK yang berbeda.");
+          alert("NIK is already registered! Please use a different NIK.");
           return;
         }
-        
+
         // Check if email already exists
         const emailQuery = query(collection(db, "employees"), where("email", "==", formData.email));
         const emailSnapshot = await getDocs(emailQuery);
-        
+
         if (!emailSnapshot.empty) {
-          alert("Email sudah terdaftar! Gunakan email yang berbeda.");
+          alert("Email is already registered! Please use a different email.");
           return;
         }
-        
+
         // Create new employee
         const employeeId = `emp-${Date.now()}`;
         await setDoc(doc(db, "employees", employeeId), {
@@ -220,17 +221,17 @@ const ManagementPage: React.FC = () => {
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp()
         });
-        
-        alert("Karyawan baru berhasil ditambahkan!");
+
+        alert("New employee added successfully!");
       }
-      
+
       // Reset form and refresh data
       resetForm();
       fetchEmployees();
-      
+
     } catch (error) {
       console.error("Error saving employee:", error);
-      alert("Terjadi kesalahan saat menyimpan data karyawan.");
+      alert("An error occurred while saving employee data.");
     }
   };
 
@@ -250,17 +251,17 @@ const ManagementPage: React.FC = () => {
   };
 
   const handleDelete = async (employee: Employee) => {
-    if (!confirm(`Apakah Anda yakin ingin menghapus karyawan ${employee.nama}?`)) {
+    if (!confirm(`Are you sure you want to delete employee ${employee.nama}?`)) {
       return;
     }
-    
+
     try {
       await deleteDoc(doc(db, "employees", employee.id));
-      alert("Karyawan berhasil dihapus!");
+      alert("Employee deleted successfully!");
       fetchEmployees();
     } catch (error) {
       console.error("Error deleting employee:", error);
-      alert("Terjadi kesalahan saat menghapus karyawan.");
+      alert("An error occurred while deleting the employee.");
     }
   };
 
@@ -294,14 +295,14 @@ const ManagementPage: React.FC = () => {
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
         if (jsonData.length === 0) {
-          alert("File Excel kosong atau format tidak sesuai!");
+          alert("Empty Excel file or incorrect format!");
           return;
         }
 
         processExcelData(jsonData as Employee[]);
       } catch (error) {
         console.error("Error reading Excel file:", error);
-        alert("Terjadi kesalahan saat membaca file Excel. Pastikan format file benar.");
+        alert("An error occurred while reading the Excel file. Please ensure the file format is correct.");
       }
     };
     reader.readAsArrayBuffer(file);
@@ -310,7 +311,7 @@ const ManagementPage: React.FC = () => {
   const processExcelData = async (data: Employee[]) => {
     setIsUploading(true);
     setUploadProgress(0);
-    
+
     const batch = writeBatch(db);
     let successCount = 0;
     let errorCount = 0;
@@ -321,14 +322,14 @@ const ManagementPage: React.FC = () => {
       try {
         // Validate required fields
         if (!row.nik || !row.nama || !row.dept || !row.jabatan || !row.email) {
-          errors.push(`Baris ${i + 2}: Data tidak lengkap`);
+          errors.push(`Row ${i + 2}: Incomplete data`);
           errorCount++;
           continue;
         }
 
         // Validasi department harus sesuai dengan yang sudah ada
         if (!departmentNames.includes(row.dept.toString())) {
-          errors.push(`Baris ${i + 2}: Department "${row.dept}" tidak terdaftar`);
+          errors.push(`Row ${i + 2}: Department "${row.dept}" is not listed`);
           errorCount++;
           continue;
         }
@@ -336,9 +337,9 @@ const ManagementPage: React.FC = () => {
         // Check if NIK already exists
         const nikQuery = query(collection(db, "employees"), where("nik", "==", row.nik.toString()));
         const nikSnapshot = await getDocs(nikQuery);
-        
+
         if (!nikSnapshot.empty) {
-          errors.push(`Baris ${i + 2}: NIK ${row.nik} sudah terdaftar`);
+          errors.push(`Row ${i + 2}: NIK ${row.nik} is already registered`);
           errorCount++;
           continue;
         }
@@ -346,9 +347,9 @@ const ManagementPage: React.FC = () => {
         // Check if email already exists
         const emailQuery = query(collection(db, "employees"), where("email", "==", row.email.toString()));
         const emailSnapshot = await getDocs(emailQuery);
-        
+
         if (!emailSnapshot.empty) {
-          errors.push(`Baris ${i + 2}: Email ${row.email} sudah terdaftar`);
+          errors.push(`Row ${i + 2}: Email ${row.email} is already registered`);
           errorCount++;
           continue;
         }
@@ -356,7 +357,7 @@ const ManagementPage: React.FC = () => {
         // Create new employee document
         const employeeId = `emp-${Date.now()}-${i}`;
         const employeeRef = doc(db, "employees", employeeId);
-        
+
         batch.set(employeeRef, {
           id: employeeId,
           nik: row.nik.toString(),
@@ -373,7 +374,7 @@ const ManagementPage: React.FC = () => {
 
         successCount++;
       } catch (error) {
-        errors.push(`Baris ${i + 2}: ${error}`);
+        errors.push(`Row ${i + 2}: ${error}`);
         errorCount++;
       }
 
@@ -385,19 +386,19 @@ const ManagementPage: React.FC = () => {
       if (successCount > 0) {
         await batch.commit();
       }
-      
-      let message = `Upload selesai!\nBerhasil: ${successCount}\nGagal: ${errorCount}`;
+
+      let message = `Upload complete!\nSuccess: ${successCount}\nFailed: ${errorCount}`;
       if (errors.length > 0) {
-        message += `\n\nError detail:\n${errors.slice(0, 5).join('\n')}`;
+        message += `\n\nError details:\n${errors.slice(0, 5).join('\n')}`;
         if (errors.length > 5) {
-          message += `\n...dan ${errors.length - 5} error lainnya`;
+          message += `\n...and ${errors.length - 5} other errors`;
         }
       }
-      
+
       alert(message);
       fetchEmployees();
     } catch (error) {
-      alert("Terjadi kesalahan saat menyimpan data: " + error);
+      alert("An error occurred while saving data: " + error);
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -410,7 +411,7 @@ const ManagementPage: React.FC = () => {
   const downloadTemplate = () => {
     // Gunakan department yang sudah ada sebagai contoh
     const exampleDept = departmentNames.length > 0 ? departmentNames[0] : "IT";
-    
+
     const templateData = [
       {
         nik: "12345",
@@ -427,12 +428,16 @@ const ManagementPage: React.FC = () => {
     // Tambahkan sheet dengan daftar department yang valid
     const deptSheet = XLSX.utils.json_to_sheet(departmentNames.map(name => ({ department: name })));
     const dataSheet = XLSX.utils.json_to_sheet(templateData);
-    
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, dataSheet, "Template");
-    XLSX.utils.book_append_sheet(workbook, deptSheet, "Departments Tersedia");
-    
-    XLSX.writeFile(workbook, "template_karyawan.xlsx");
+    XLSX.utils.book_append_sheet(workbook, deptSheet, "Available Departments");
+
+    XLSX.writeFile(workbook, "employee_template.xlsx");
+  };
+
+  const handleSidebarToggle = () => {
+    setIsSidebarOpen(!isSidebarOpen);
   };
 
   if (isLoading) {
@@ -444,9 +449,56 @@ const ManagementPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
-      {/* Sidebar */}
-      <div className="w-64 bg-white shadow-lg">
+    <div className="min-h-screen flex flex-col md:flex-row bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
+      {/* Sidebar - Mobile View */}
+      <div className={`fixed inset-y-0 left-0 z-50 md:hidden bg-white shadow-lg w-64 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out`}>
+        <div className="p-4 border-b border-green-100 flex justify-end">
+          <button onClick={handleSidebarToggle} className="text-gray-500 hover:text-gray-700 focus:outline-none">
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div className="p-4 border-b border-green-100 text-center">
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
+              <span className="text-white font-bold text-xl">POA</span>
+            </div>
+          </div>
+          <h1 className="text-lg font-bold text-center text-gray-800">Prestova One Approval</h1>
+        </div>
+        <nav className="p-4">
+          <ul className="space-y-2">
+            <li>
+              <Link href="/dashboard" onClick={handleSidebarToggle} className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
+                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to Dashboard
+              </Link>
+            </li>
+            <li>
+              <div className="flex items-center p-2 rounded-lg bg-green-50 text-green-700 font-medium">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="mr-3 size-6">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+                </svg>
+                User & Employee
+              </div>
+            </li>
+            <li>
+              <Link href="/admin/departments" onClick={handleSidebarToggle} className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="mr-3 size-6">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 21v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21m0 0h4.5V3.545M12.75 21h7.5V10.75M2.25 21h1.5m18 0h-18M2.25 9l4.5-1.636M18.75 3l-1.5.545m0 6.205 3 1m1.5.5-1.5-.5M6.75 7.364V3h-3v18m3-13.636 10.5-3.819" />
+                </svg>
+                Department
+              </Link>
+            </li>
+          </ul>
+        </nav>
+      </div>
+
+      {/* Sidebar - Desktop View */}
+      <div className="hidden md:block w-64 bg-white shadow-lg">
         <div className="p-4 border-b border-green-100">
           <div className="flex items-center justify-center mb-4">
             <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
@@ -462,22 +514,26 @@ const ManagementPage: React.FC = () => {
               <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
               </svg>
-              Kembali ke Dashboard
+              Back to Dashboard
             </Link>
           </div>
-          
+
           <div className="mb-6">
-            <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Manajemen</h2>
+            <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Management</h2>
             <ul className="space-y-1">
               <li>
                 <div className="flex items-center p-2 rounded-lg bg-green-50 text-green-700 font-medium">
-                  <span className="mr-3">👥</span>
-                  User & Karyawan
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="mr-3 size-6">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
+                  </svg>
+                  User & Employees
                 </div>
               </li>
               <li>
                 <Link href="/admin/departments" className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
-                  <span className="mr-3">🏢</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="mr-3 size-6">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 21v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21m0 0h4.5V3.545M12.75 21h7.5V10.75M2.25 21h1.5m18 0h-18M2.25 9l4.5-1.636M18.75 3l-1.5.545m0 6.205 3 1m1.5.5-1.5-.5M6.75 7.364V3h-3v18m3-13.636 10.5-3.819" />
+                  </svg>
                   Department
                 </Link>
               </li>
@@ -491,23 +547,33 @@ const ManagementPage: React.FC = () => {
         {/* Header */}
         <header className="bg-white shadow-sm border-b border-green-100">
           <div className="flex items-center justify-between p-4">
+            <div className="md:hidden">
+              <button onClick={handleSidebarToggle} className="text-gray-500 hover:text-gray-700 focus:outline-none">
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                </svg>
+              </button>
+            </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Manajemen User & Karyawan</h1>
-              <p className="text-sm text-gray-500">Kelola data user dan karyawan sistem POA</p>
+              <h1 className="text-2xl font-bold text-gray-900">User & Employee Management</h1>
+              <p className="text-sm text-gray-500">Manage POA system user and employee data</p>
             </div>
             <div className="flex space-x-2">
               <button
                 onClick={() => setShowUploadForm(true)}
-                className="px-4 py-2 bg-gradient-to-r from-sky-500 to-sky-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-blue-700 transition"
+                className="px-4 py-2 bg-gradient-to-r from-sky-500 to-sky-600 text-white rounded-lg font-medium hover:from-blue-600 hover:to-blue-700 transition flex items-center gap-2"
               >
-                <i className="ri-file-upload-line"></i> Upload Excel
+                <i className="ri-file-upload-line"></i>
+                <span className="hidden sm:inline">Upload Excel</span>
               </button>
               <button
                 onClick={() => setShowAddForm(true)}
-                className="px-4 py-2 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] transition"
+                className="px-4 py-2 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] transition flex items-center gap-2"
               >
-                + Tambah Karyawan
+                <i className="ri-user-add-line"></i>
+                <span className="hidden sm:inline">Add Employee</span>
               </button>
+
             </div>
           </div>
         </header>
@@ -518,32 +584,32 @@ const ManagementPage: React.FC = () => {
           <div className="bg-white rounded-xl shadow-md p-6 mb-6 border border-green-100">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cari Karyawan</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Search Employee</label>
                 <input
                   type="text"
-                  placeholder="Cari berdasarkan nama, NIK, email, atau telepon..."
+                  placeholder="Search by name, NIK, email, or phone..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Filter Department</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Department</label>
                 <select
                   value={deptFilter}
                   onChange={(e) => setDeptFilter(e.target.value)}
                   className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                 >
-                  <option value="">Semua Department</option>
+                  <option value="">All Departments</option>
                   {departmentNames.map(dept => (
                     <option key={dept} value={dept}>{dept}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Total Karyawan</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Total Employees</label>
                 <div className="bg-gray-50 p-2 rounded-lg border border-gray-300">
-                  <span className="text-lg font-bold text-green-600">{filteredEmployees.length}</span> Orang
+                  <span className="text-lg font-bold text-green-600">{filteredEmployees.length}</span> People
                 </div>
               </div>
             </div>
@@ -552,20 +618,20 @@ const ManagementPage: React.FC = () => {
           {/* Form Upload Excel */}
           {showUploadForm && (
             <div className="bg-white rounded-xl shadow-md p-6 mb-6 border border-green-100">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Upload Data Karyawan dari Excel</h2>
-              
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Upload Employee Data from Excel</h2>
+
               <div className="mb-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <h3 className="font-medium text-blue-800 mb-2">📋 Format File Excel:</h3>
+                <h3 className="font-medium text-blue-800 mb-2">搭 Excel File Format:</h3>
                 <ul className="text-sm text-blue-700 list-disc list-inside space-y-1">
-                  <li>Kolom wajib: nik, nama, dept, jabatan, email</li>
-                  <li>Kolom opsional: telepon, role, status</li>
-                  <li>Role default: staff | Status default: active</li>
-                  <li>Format file: .xlsx atau .xls</li>
-                  <li>Department harus sesuai dengan yang sudah terdaftar</li>
+                  <li>Required columns: nik, nama, dept, jabatan, email</li>
+                  <li>Optional columns: telepon, role, status</li>
+                  <li>Default role: staff | Default status: active</li>
+                  <li>File format: .xlsx or .xls</li>
+                  <li>Department must match an existing department</li>
                 </ul>
                 {departmentNames.length > 0 && (
                   <div className="mt-2">
-                    <p className="text-sm text-blue-700 font-medium">Departments yang tersedia:</p>
+                    <p className="text-sm text-blue-700 font-medium">Available Departments:</p>
                     <p className="text-sm text-blue-600">{departmentNames.join(", ")}</p>
                   </div>
                 )}
@@ -573,7 +639,7 @@ const ManagementPage: React.FC = () => {
                   onClick={downloadTemplate}
                   className="mt-3 px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded hover:bg-blue-200 transition"
                 >
-                  📥 Download Template
+                  踏 Download Template
                 </button>
               </div>
 
@@ -591,21 +657,21 @@ const ManagementPage: React.FC = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
                   <p className="text-sm text-gray-600">
-                    Klik untuk upload file Excel
+                    Click to upload an Excel file
                   </p>
-                  <p className="text-xs text-gray-500 mt-1">Format .xlsx atau .xls (maks. 5MB)</p>
+                  <p className="text-xs text-gray-500 mt-1">.xlsx or .xls format (max. 5MB)</p>
                 </label>
               </div>
 
               {isUploading && (
                 <div className="mt-4">
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-gray-700">Progress Upload</span>
+                    <span className="text-sm font-medium text-gray-700">Upload Progress</span>
                     <span className="text-sm font-medium text-gray-700">{uploadProgress}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-green-600 h-2 rounded-full transition-all duration-300" 
+                    <div
+                      className="bg-green-600 h-2 rounded-full transition-all duration-300"
                       style={{ width: `${uploadProgress}%` }}
                     ></div>
                   </div>
@@ -618,7 +684,7 @@ const ManagementPage: React.FC = () => {
                   onClick={() => setShowUploadForm(false)}
                   className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
                 >
-                  Batal
+                  Cancel
                 </button>
               </div>
             </div>
@@ -628,9 +694,9 @@ const ManagementPage: React.FC = () => {
           {showAddForm && (
             <div className="bg-white rounded-xl shadow-md p-6 mb-6 border border-green-100">
               <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                {editingEmployee ? "Edit Data Karyawan" : "Tambah Karyawan Baru"}
+                {editingEmployee ? "Edit Employee Data" : "Add New Employee"}
               </h2>
-              
+
               <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">NIK *</label>
@@ -642,12 +708,12 @@ const ManagementPage: React.FC = () => {
                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                     required
                     disabled={!!editingEmployee}
-                    placeholder="Nomor Induk Karyawan"
+                    placeholder="Employee ID Number"
                   />
                 </div>
-                
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nama Lengkap *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
                   <input
                     type="text"
                     name="nama"
@@ -655,10 +721,10 @@ const ManagementPage: React.FC = () => {
                     onChange={handleChange}
                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                     required
-                    placeholder="Nama lengkap karyawan"
+                    placeholder="Employee full name"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Department *</label>
                   <select
@@ -668,16 +734,16 @@ const ManagementPage: React.FC = () => {
                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                     required
                   >
-                    <option value="">Pilih Department</option>
+                    <option value="">Select Department</option>
                     {departmentNames.map(dept => (
                       <option key={dept} value={dept}>{dept}</option>
                     ))}
                   </select>
-                  <p className="text-xs text-gray-500 mt-1">Harus sesuai dengan department yang sudah terdaftar</p>
+                  <p className="text-xs text-gray-500 mt-1">Must match an existing department</p>
                 </div>
-                
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Jabatan *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Position *</label>
                   <input
                     type="text"
                     name="jabatan"
@@ -685,10 +751,10 @@ const ManagementPage: React.FC = () => {
                     onChange={handleChange}
                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                     required
-                    placeholder="Posisi/jabatan"
+                    placeholder="Position/title"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                   <input
@@ -698,12 +764,12 @@ const ManagementPage: React.FC = () => {
                     onChange={handleChange}
                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                     required
-                    placeholder="email@perusahaan.com"
+                    placeholder="email@company.com"
                   />
                 </div>
-                
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nomor Telepon *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
                   <input
                     type="tel"
                     name="telepon"
@@ -714,7 +780,7 @@ const ManagementPage: React.FC = () => {
                     placeholder="08123456789"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
                   <select
@@ -730,7 +796,7 @@ const ManagementPage: React.FC = () => {
                     <option value="admin">Admin</option>
                   </select>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                   <select
@@ -740,24 +806,24 @@ const ManagementPage: React.FC = () => {
                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                     required
                   >
-                    <option value="active">Aktif</option>
-                    <option value="inactive">Non-Aktif</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
                   </select>
                 </div>
-                
+
                 <div className="md:col-span-2 flex justify-end space-x-3 pt-4">
                   <button
                     type="button"
                     onClick={resetForm}
                     className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
                   >
-                    Batal
+                    Cancel
                   </button>
                   <button
                     type="submit"
                     className="px-6 py-2.5 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] transition"
                   >
-                    {editingEmployee ? "Update" : "Simpan"}
+                    {editingEmployee ? "Update" : "Save"}
                   </button>
                 </div>
               </form>
@@ -766,14 +832,14 @@ const ManagementPage: React.FC = () => {
 
           {/* Tabel Karyawan */}
           <div className="bg-white rounded-xl shadow-md p-6 border border-green-100">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Daftar Karyawan</h2>
-            
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Employee List</h2>
+
             {filteredEmployees.length === 0 ? (
               <div className="text-center py-8">
                 <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
                 </svg>
-                <p className="text-gray-500">Tidak ada data karyawan yang ditemukan.</p>
+                <p className="text-gray-500">No employee data found.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -781,14 +847,14 @@ const ManagementPage: React.FC = () => {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">NIK</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Nama</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Name</th>
                       <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Department</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Jabatan</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Position</th>
                       <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Email</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Telepon</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Phone</th>
                       <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Role</th>
                       <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Status</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Aksi</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -801,20 +867,18 @@ const ManagementPage: React.FC = () => {
                         <td className="px-4 py-3 text-sm text-gray-600">{employee.email}</td>
                         <td className="px-4 py-3 text-sm text-gray-600">{employee.telepon || "-"}</td>
                         <td className="px-4 py-3 text-sm">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            employee.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${employee.role === 'admin' ? 'bg-purple-100 text-purple-800' :
                             employee.role === 'manager' ? 'bg-blue-100 text-blue-800' :
-                            employee.role === 'hrd' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-green-100 text-green-800'
-                          }`}>
+                              employee.role === 'hrd' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-green-100 text-green-800'
+                            }`}>
                             {employee.role}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            employee.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}>
-                            {employee.status === 'active' ? 'Aktif' : 'Non-Aktif'}
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${employee.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            }`}>
+                            {employee.status === 'active' ? 'Active' : 'Inactive'}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm">
@@ -824,12 +888,12 @@ const ManagementPage: React.FC = () => {
                               className="text-green-600 hover:text-green-800"
                               title="Edit"
                             >
-                             <i className="ri-pencil-fill text-green-600"></i>
+                              <i className="ri-pencil-fill text-green-600"></i>
                             </button>
                             <button
                               onClick={() => handleDelete(employee)}
                               className="text-red-600 hover:text-red-800"
-                              title="Hapus"
+                              title="Delete"
                             >
                               <i className="ri-delete-bin-line"></i>
                             </button>

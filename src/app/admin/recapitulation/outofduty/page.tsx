@@ -61,6 +61,7 @@ const OutOfDutyRecapitulationPage: React.FC = () => {
     const [departments, setDepartments] = useState<string[]>([]);
     const [deptIdToName, setDeptIdToName] = useState<Map<string, string>>(new Map());
     const [selectedDept, setSelectedDept] = useState<string>("");
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const router = useRouter();
 
     const safeToDate = (value: Timestamp | string): Date | null => {
@@ -84,18 +85,26 @@ const OutOfDutyRecapitulationPage: React.FC = () => {
     };
 
     const formatStatusText = (status: string) => {
-        return status.replace(/_/g, " ").toUpperCase();
+        switch (status) {
+            case "gm_approved": return "GM Approved";
+            case "manager_approved": return "Manager Approved";
+            case "hrd_approved": return "HRD Approved";
+            case "rejected": return "Rejected";
+            case "pending": return "Pending";
+            case "approved": return "Approved";
+            default: return status.replace(/_/g, " ").toUpperCase();
+        }
     };
 
     const formatTime = (waktuMulai?: string, waktuSelesai?: string, jenisIzin?: string) => {
         if (jenisIzin === "tidak-hadir") {
-            return "Tidak Hadir (1 hari)";
+            return "Absent (1 day)";
         }
         if (jenisIzin === "pulang-lebih-awal" && waktuSelesai) {
-            return `s/d ${waktuSelesai}`;
+            return `until ${waktuSelesai}`;
         }
         if (jenisIzin === "datang-terlambat" && waktuMulai) {
-            return `Mulai ${waktuMulai}`;
+            return `Starts ${waktuMulai}`;
         }
         if (waktuMulai && waktuSelesai) {
             return `${waktuMulai} - ${waktuSelesai}`;
@@ -199,14 +208,14 @@ const OutOfDutyRecapitulationPage: React.FC = () => {
         const dataToExport = outOfDutyData.flatMap((form, formIndex) =>
             form.entries.map((entry, entryIndex) => {
                 const formattedTime = formatTime(form.waktuMulai, form.waktuSelesai, form.jenisIzin);
-                const vehicleDetails = form.menggunakanKendaraan ? `Ya (Supir: ${form.namaSupir || '-'}, Plat: ${form.platNomor || '-'})` : "Tidak";
-                const rekanList = form.bawaRekan && form.rekan ? form.rekan.map(r => r.nama).join(', ') : "Tidak";
+                const vehicleDetails = form.menggunakanKendaraan ? `Yes (Driver: ${form.namaSupir || '-'}, Plate: ${form.platNomor || '-'})` : "No";
+                const rekanList = form.bawaRekan && form.rekan ? form.rekan.map(r => r.nama).join(', ') : "None";
 
                 return {
                     "No": `${formIndex + 1}.${entryIndex + 1}`,
                     "Form ID": form.id,
                     "Requester": form.requesterName,
-                    "Date Submitted": safeToDate(form.createdAt)?.toLocaleDateString('id-ID'),
+                    "Date Submitted": safeToDate(form.createdAt)?.toLocaleDateString('en-US'),
                     "Department": deptIdToName.get(form.deptId as string),
                     "Employee Name": entry.employee.nama,
                     "Employee NIK": entry.employee.nik,
@@ -257,8 +266,15 @@ const OutOfDutyRecapitulationPage: React.FC = () => {
 
     return (
         <div className="min-h-screen flex bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
+            {/* Sidebar Overlay */}
+            {isSidebarOpen && (
+                <div 
+                    className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                ></div>
+            )}
             {/* Sidebar */}
-            <div className="w-64 bg-white shadow-lg">
+            <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0`}>
                 <div className="p-4 border-b border-green-100">
                     <div className="flex items-center justify-center mb-4">
                         <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
@@ -282,7 +298,7 @@ const OutOfDutyRecapitulationPage: React.FC = () => {
                             <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Administration</h2>
                             <ul className="space-y-2">
                                 <li><Link href="/admin/users" className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition"><svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" /></svg>User Management</Link></li>
-                                <li><Link href="/admin/recapitulation/reimburse" className="flex items-center p-2 rounded-lg bg-green-50 text-green-700 font-medium"><svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 2v-6m2 12H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>Recapitulation</Link></li>
+                                <li><Link href="/admin/recapitulation/reimburse" className="flex items-center p-2 rounded-lg bg-green-50 text-green-700  transition"><svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 2v-6m2 12H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>Recapitulation</Link></li>
                                 <li><Link href="/admin/recapitulation" className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
                                     <svg fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-5 h-5 mr-3">
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
@@ -299,6 +315,14 @@ const OutOfDutyRecapitulationPage: React.FC = () => {
                 {/* Header */}
                 <header className="bg-white shadow-sm border-b border-green-100">
                     <div className="flex items-center justify-between p-4">
+                        <button 
+                            className="md:hidden p-2 text-gray-600 hover:text-gray-900 transition"
+                            onClick={() => setIsSidebarOpen(true)}
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                            </svg>
+                        </button>
                         <h1 className="text-2xl font-bold text-gray-900">Out of Duty Recapitulation</h1>
                         <div className="flex items-center space-x-4">
                             <div className="text-right">
@@ -355,7 +379,7 @@ const OutOfDutyRecapitulationPage: React.FC = () => {
                                         {outOfDutyData.flatMap((form, formIndex) =>
                                             form.entries.map((entry, entryIndex) => {
                                                 const formattedTime = formatTime(form.waktuMulai, form.waktuSelesai, form.jenisIzin);
-                                                const vehicleDetails = form.menggunakanKendaraan ? `Yes (Driver: ${form.namaSupir || '-'}, ${form.platNomor || '-'})` : "No";
+                                                const vehicleDetails = form.menggunakanKendaraan ? `Yes (Driver: ${form.namaSupir || '-'}, Plate: ${form.platNomor || '-'})` : "No";
                                                 const rekanList = form.bawaRekan && form.rekan ? form.rekan.map(r => r.nama).join(', ') : "None";
                                                 const formattedStatus = formatStatusText(getFinalStatus(form.approvalFlow || []));
                                                 const statusColor = getStatusColor(getFinalStatus(form.approvalFlow || []));
@@ -365,7 +389,7 @@ const OutOfDutyRecapitulationPage: React.FC = () => {
                                                         <td className="py-3 px-4 text-sm text-gray-600">{formIndex + 1}</td>
                                                         <td className="py-3 px-4 text-sm font-medium text-gray-900">{form.id}</td>
                                                         <td className="py-3 px-4 text-sm text-gray-600">{form.requesterName}</td>
-                                                        <td className="py-3 px-4 text-sm text-gray-600">{safeToDate(form.createdAt)?.toLocaleDateString('id-ID')}</td>
+                                                        <td className="py-3 px-4 text-sm text-gray-600">{safeToDate(form.createdAt)?.toLocaleDateString('en-US')}</td>
                                                         <td className="py-3 px-4 text-sm text-gray-600">{deptIdToName.get(form.deptId as string)}</td>
                                                         <td className="py-3 px-4 text-sm text-gray-600">{entry.employee.nama}</td>
                                                         <td className="py-3 px-4 text-sm text-gray-600">{entry.employee.nik}</td>

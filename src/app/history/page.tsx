@@ -6,8 +6,9 @@ import { db, auth } from "@/lib/firebase";
 import { collection, getDocs, doc, query, where, orderBy, getDoc } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { Timestamp } from "firebase/firestore";
+import Swal from "sweetalert2";
 
-// Interfaces (Pastikan ini sesuai dengan struktur data Anda di Firestore)
+// Interfaces (Ensure these match your Firestore data structure)
 interface ApprovalStep {
     role: string;
     dept?: string;
@@ -49,6 +50,7 @@ export default function AllFormsPage() {
     const [departments, setDepartments] = useState<Record<string, any>>({});
     const [error, setError] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState<string>("");
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     // Helper function to safely convert Firestore Timestamp or string to Date object
     const safeToDate = (value: Timestamp | string | null | undefined): Date | null => {
@@ -165,6 +167,55 @@ export default function AllFormsPage() {
         fetchData();
     }, [user]);
 
+    const handleSidebarToggle = () => {
+      setIsSidebarOpen(!isSidebarOpen);
+    };
+
+    // FUNGSI BARU UNTUK MENGIRIM BROADCAST EMAIL
+    const handleSendEmailBroadcast = async (formId: string) => {
+        try {
+            const confirmed = await Swal.fire({
+                title: 'Apakah Anda yakin?',
+                text: "Ini akan mengirimkan email broadcast ke semua pihak terkait (pengaju, manager, GM, HRD, Finance).",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#3085d6',
+                cancelButtonColor: '#d33',
+                confirmButtonText: 'Ya, Kirim Email!',
+                cancelButtonText: 'Batal'
+            }).then((result) => result.isConfirmed);
+
+            if (!confirmed) {
+                return;
+            }
+
+            Swal.fire({
+                title: 'Sedang Mengirim Email...',
+                text: 'Mohon tunggu sebentar.',
+                allowOutsideClick: false,
+                didOpen: () => {
+                    Swal.showLoading();
+                }
+            });
+
+            const response = await fetch('/api/send-full-broadcast', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ formId }),
+            });
+
+            if (response.ok) {
+                Swal.fire('Berhasil!', 'Email broadcast berhasil dikirim.', 'success');
+            } else {
+                Swal.fire('Gagal!', 'Gagal mengirim email broadcast. Silakan coba lagi.', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to send broadcast email:', error);
+            Swal.fire('Error', 'Terjadi kesalahan saat mengirim email.', 'error');
+        }
+    };
+
+
     // Filter requests based on search query
     const filteredRequests = requests.filter(req => {
         const query = searchQuery.toLowerCase();
@@ -232,7 +283,7 @@ export default function AllFormsPage() {
             <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
                 <div className="bg-white p-6 rounded-lg shadow-md max-w-md text-center">
                     <p className="text-gray-600">
-                        Anda harus login untuk melihat halaman ini.
+                      You must be logged in to view this page.
                     </p>
                 </div>
             </div>
@@ -240,9 +291,58 @@ export default function AllFormsPage() {
     }
 
     return (
-        <div className="min-h-screen flex bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
-            {/* Sidebar */}
-            <div className="w-64 bg-white shadow-lg">
+        <div className="min-h-screen flex flex-col md:flex-row bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
+             {/* Sidebar - Mobile View */}
+            <div className={`fixed inset-y-0 left-0 z-50 md:hidden bg-white shadow-lg w-64 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out`}>
+                <div className="p-4 border-b border-green-100 flex justify-end">
+                    <button onClick={handleSidebarToggle} className="text-gray-500 hover:text-gray-700 focus:outline-none">
+                        <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                </div>
+                <div className="p-4 border-b border-green-100 text-center">
+                    <div className="flex items-center justify-center mb-4">
+                        <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
+                            <span className="text-white font-bold text-xl">POA</span>
+                        </div>
+                    </div>
+                    <h1 className="text-lg font-bold text-center text-gray-800">Prestova One Approval</h1>
+                </div>
+                <nav className="p-4">
+                    <ul className="space-y-2">
+                        <li>
+                            <Link href="/dashboard" onClick={handleSidebarToggle} className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
+                                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                                </svg>
+                                Back to Dashboard
+                            </Link>
+                        </li>
+                        <li>
+                            <Link href="/approvals" onClick={handleSidebarToggle} className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
+                                <span className="mr-3">✅</span>
+                                Approvals
+                            </Link>
+                        </li>
+                        <li>
+                            <Link href="/history" onClick={handleSidebarToggle} className="flex items-center p-2 rounded-lg bg-green-50 text-green-700 font-medium">
+                                <span className="mr-3">📋</span>
+                                My Requests
+                            </Link>
+                        </li>
+                        <li>
+                            <Link href="/forms" onClick={handleSidebarToggle} className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
+                                <span className="mr-3">➕</span>
+                                New Request
+                            </Link>
+                        </li>
+                    </ul>
+                </nav>
+            </div>
+
+            {/* Sidebar - Desktop View */}
+            <div className="hidden md:block w-64 bg-white shadow-lg">
                 <div className="p-4 border-b border-green-100">
                     <div className="flex items-center justify-center mb-4">
                         <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
@@ -258,12 +358,12 @@ export default function AllFormsPage() {
                             <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                             </svg>
-                            Kembali ke Dashboard
+                            Back to Dashboard
                         </Link>
                     </div>
 
                     <div className="mb-6">
-                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Menu Utama</h2>
+                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Main Menu</h2>
                         <ul className="space-y-1">
                             <li>
                                 <Link href="/approvals" className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
@@ -293,12 +393,19 @@ export default function AllFormsPage() {
                 {/* Header */}
                 <header className="bg-white shadow-sm border-b border-green-100">
                     <div className="flex items-center justify-between p-4">
+                        <div className="md:hidden">
+                            <button onClick={handleSidebarToggle} className="text-gray-500 hover:text-gray-700 focus:outline-none">
+                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                                </svg>
+                            </button>
+                        </div>
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">History Forms</h1>
-                            <p className="text-sm text-gray-500">Monitoring all forms submitted across the organization</p>
+                            <h1 className="text-2xl font-bold text-gray-900">Form History</h1>
+                            <p className="text-sm text-gray-500">Track and manage all submitted forms</p>
                         </div>
                         <div className="flex items-center space-x-3">
-                            <span className="text-sm text-gray-600">Welcome, {user?.nama || user?.displayName || user?.email}</span>
+                            <span className="text-sm text-gray-600 hidden sm:inline">Welcome, {user?.nama || user?.displayName || user?.email}</span>
                             <span className={`px-2 py-1 rounded-full text-xs font-medium uppercase ${user?.role === 'admin' ? 'bg-purple-100 text-purple-800' :
                                 user?.role === 'manager' ? 'bg-blue-100 text-blue-800' :
                                     user?.role === 'general_manager' ? 'bg-indigo-100 text-indigo-800' :
@@ -313,14 +420,14 @@ export default function AllFormsPage() {
                 </header>
 
                 {/* Main Content */}
-                <main className="p-6">
-                    <div className="bg-white rounded-xl shadow-md p-6 border border-green-100">
-                        <div className="flex items-center justify-between mb-4">
+                <main className="p-4 md:p-6">
+                    <div className="bg-white rounded-xl shadow-md p-4 md:p-6 border border-green-100">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-4">
                             <h2 className="text-xl font-semibold text-gray-900">Total Requests: {filteredRequests.length}</h2>
-                            <div className="relative w-64">
+                            <div className="relative w-full sm:w-64">
                                 <input
                                     type="text"
-                                    placeholder="Cari ID, jenis, atau pengaju..."
+                                    placeholder="Search by ID, type, or requester..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
                                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
@@ -343,42 +450,53 @@ export default function AllFormsPage() {
                                     const approvedAtDate = safeToDate(lastStep?.approvedAt);
 
                                     return (
-                                        <div key={req.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-                                            <div className="flex justify-between items-start mb-2">
+                                        <div key={req.id} className="border border-gray-200 rounded-lg p-4 md:p-6 hover:shadow-md transition-shadow">
+                                            <div className="flex flex-col sm:flex-row justify-between items-start mb-2">
                                                 <div>
                                                     <h3 className="font-semibold text-lg text-gray-900">
                                                         {req.type.toUpperCase()} - {req.deptId ? getDeptName(req.deptId) : req.dept}
                                                     </h3>
                                                     <p className="text-sm text-gray-600 uppercase font-semibold">
-                                                        ID Formulir: {req.id}
+                                                        Form ID: {req.id}
                                                     </p>
                                                     <p className="text-sm text-gray-600">
-                                                        Pengaju: {req.requesterName}
+                                                        Requester: {req.requesterName}
                                                     </p>
                                                     <p className="text-sm text-gray-600">
-                                                        Tanggal Pengajuan: {createdAtDate ? createdAtDate.toLocaleDateString('id-ID') : 'N/A'}
+                                                        Submission Date: {createdAtDate ? createdAtDate.toLocaleDateString() : 'N/A'}
                                                     </p>
                                                 </div>
-                                                <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(req.status)}`}>
-                                                    {req.status.toUpperCase()}
-                                                </span>
+                                                <div className="flex flex-col sm:items-end">
+                                                    <span className={`mt-2 sm:mt-0 px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(req.status)}`}>
+                                                        {req.status.toUpperCase()}
+                                                    </span>
+
+                                                    {req.status === 'approved' && (
+                                                        <button
+                                                            onClick={() => handleSendEmailBroadcast(req.id)}
+                                                            className="mt-2 px-4 py-2 bg-lime-500 text-white rounded-lg hover:bg-lime-600 transition text-sm font-medium"
+                                                        >
+                                                            Send Email Broadcast
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
 
                                             {lastStep && (
                                                 <div className="mt-4 p-4 border-t border-gray-200 bg-gray-50 rounded-lg">
-                                                    <p className="font-semibold text-sm text-gray-800">Langkah Terakhir:</p>
+                                                    <p className="font-semibold text-sm text-gray-800">Last Step:</p>
                                                     <p className="text-sm text-gray-600">
-                                                        Penanggung Jawab: {lastStep.approvedByName || lastStep.approvedBy}
+                                                        Responsible Party: {lastStep.approvedByName || lastStep.approvedBy}
                                                     </p>
                                                     <p className="text-sm text-gray-600">
                                                         Status: <span className={`font-semibold ${lastStep.status === 'approved' ? 'text-green-600' : 'text-red-600'}`}>{lastStep.status.toUpperCase()}</span>
                                                     </p>
                                                     <p className="text-sm text-gray-600">
-                                                        Tanggal: {approvedAtDate ? approvedAtDate.toLocaleString('id-ID') : 'N/A'}
+                                                        Date: {approvedAtDate ? approvedAtDate.toLocaleString() : 'N/A'}
                                                     </p>
                                                     {lastStep.comments && (
                                                         <p className="text-sm text-gray-600 mt-2">
-                                                            Komentar: <span className="italic">"{lastStep.comments}"</span>
+                                                            Comment: <span className="italic">"{lastStep.comments}"</span>
                                                         </p>
                                                     )}
                                                 </div>

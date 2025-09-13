@@ -10,7 +10,7 @@ import Swal from 'sweetalert2';
 // Interfaces (Pastikan ini sesuai dengan struktur data Anda di Firestore)
 interface Employee {
   id: string;
-  nama: string;
+  name: string;
   nik: string;
   dept: string;
   deptId?: string;
@@ -18,10 +18,10 @@ interface Employee {
 
 interface OvertimeEntry {
   employee: Employee;
-  jamMulai: string;
-  jamSelesai: string;
-  tanggal: string;
-  totalJam: number;
+  startTime: string;
+  endTime: string;
+  date: string;
+  totalHours: number;
   breakTime: number;
 }
 
@@ -178,6 +178,7 @@ export default function ApprovalsPage() {
   const [departments, setDepartments] = useState<Record<string, any>>({});
   const [managers, setManagers] = useState<Record<string, any>>({});
   const [error, setError] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   // Fetch user data from Firestore
   useEffect(() => {
@@ -544,6 +545,10 @@ export default function ApprovalsPage() {
     ];
   };
 
+  const handleSidebarToggle = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
@@ -570,7 +575,7 @@ export default function ApprovalsPage() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
         <div className="bg-white p-6 rounded-lg shadow-md max-w-md text-center">
           <p className="text-gray-600">
-            Anda tidak memiliki hak akses untuk melihat halaman ini.
+            You do not have access rights to view this page.
           </p>
         </div>
       </div>
@@ -578,9 +583,58 @@ export default function ApprovalsPage() {
   }
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
-      {/* Sidebar */}
-      <div className="w-64 bg-white shadow-lg">
+    <div className="min-h-screen flex flex-col md:flex-row bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
+      {/* Sidebar - Mobile View */}
+      <div className={`fixed inset-y-0 left-0 z-50 md:hidden bg-white shadow-lg w-64 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out`}>
+        <div className="p-4 border-b border-green-100 flex justify-end">
+          <button onClick={handleSidebarToggle} className="text-gray-500 hover:text-gray-700 focus:outline-none">
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div className="p-4 border-b border-green-100 text-center">
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
+              <span className="text-white font-bold text-xl">POA</span>
+            </div>
+          </div>
+          <h1 className="text-lg font-bold text-center text-gray-800">Prestova One Approval</h1>
+        </div>
+        <nav className="p-4">
+          <ul className="space-y-2">
+            <li>
+              <Link href="/dashboard" onClick={handleSidebarToggle} className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
+                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to Dashboard
+              </Link>
+            </li>
+            <li>
+              <Link href="/approvals" onClick={handleSidebarToggle} className="flex items-center p-2 rounded-lg bg-green-50 text-green-700 font-medium">
+                <span className="mr-3">✅</span>
+                Approvals
+              </Link>
+            </li>
+            <li>
+              <Link href="/history" onClick={handleSidebarToggle} className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
+                <span className="mr-3">📋</span>
+                My Requests
+              </Link>
+            </li>
+            <li>
+              <Link href="/forms" onClick={handleSidebarToggle} className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
+                <span className="mr-3">➕</span>
+                New Request
+              </Link>
+            </li>
+          </ul>
+        </nav>
+      </div>
+
+      {/* Sidebar - Desktop View */}
+      <div className="hidden md:block w-64 bg-white shadow-lg">
         <div className="p-4 border-b border-green-100">
           <div className="flex items-center justify-center mb-4">
             <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
@@ -596,12 +650,12 @@ export default function ApprovalsPage() {
               <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
               </svg>
-              Kembali ke Dashboard
+              Back to Dashboard
             </Link>
           </div>
 
           <div className="mb-6">
-            <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Menu Utama</h2>
+            <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Main Menu</h2>
             <ul className="space-y-1">
               <li>
                 <Link href="/approvals" className="flex items-center p-2 rounded-lg bg-green-50 text-green-700 font-medium">
@@ -631,12 +685,19 @@ export default function ApprovalsPage() {
         {/* Header */}
         <header className="bg-white shadow-sm border-b border-green-100">
           <div className="flex items-center justify-between p-4">
+            <div className="md:hidden">
+              <button onClick={handleSidebarToggle} className="text-gray-500 hover:text-gray-700 focus:outline-none">
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                </svg>
+              </button>
+            </div>
             <div>
               <h1 className="text-2xl font-bold text-gray-900">Approval Requests</h1>
               <p className="text-sm text-gray-500">Review and approve pending requests</p>
             </div>
             <div className="flex items-center space-x-3">
-              <span className="text-sm text-gray-600">Welcome, {user?.nama || user?.displayName || user?.email}</span>
+              <span className="text-sm text-gray-600 hidden sm:inline">Welcome, {user?.nama || user?.displayName || user?.email}</span>
               <span className={`px-2 py-1 rounded-full text-xs font-medium uppercase ${user?.role === 'admin' ? 'bg-purple-100 text-purple-800' :
                 user?.role === 'manager' ? 'bg-blue-100 text-blue-800' :
                   user?.role === 'general_manager' ? 'bg-indigo-100 text-indigo-800' :
@@ -651,16 +712,16 @@ export default function ApprovalsPage() {
         </header>
 
         {/* Main Content */}
-        <main className="p-6">
+        <main className="p-4 md:p-6">
           {/* Filter Section */}
-          <div className="bg-white rounded-xl shadow-md p-6 mb-6 border border-green-100">
-            <div className="flex flex-wrap gap-4 items-center">
+          <div className="bg-white rounded-xl shadow-md p-4 md:p-6 mb-4 md:mb-6 border border-green-100">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-4 items-center">
               <label htmlFor="filterStatus" className="text-sm font-medium text-gray-700">Filter Status:</label>
               <select
                 id="filterStatus"
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition w-full sm:w-auto"
               >
                 {getStatusFilterOptions().map(option => (
                   <option key={option.value} value={option.value}>
@@ -675,7 +736,7 @@ export default function ApprovalsPage() {
           </div>
 
           {/* Requests List */}
-          <div className="bg-white rounded-xl shadow-md p-6 border border-green-100">
+          <div className="bg-white rounded-xl shadow-md p-4 md:p-6 border border-green-100">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">Request List</h2>
 
             {filteredRequests.length === 0 ? (
@@ -688,8 +749,8 @@ export default function ApprovalsPage() {
             ) : (
               <div className="space-y-4">
                 {filteredRequests.map(req => (
-                  <div key={req.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-                    <div className="flex justify-between items-start mb-4">
+                  <div key={req.id} className="border border-gray-200 rounded-lg p-4 md:p-6 hover:shadow-md transition-shadow">
+                    <div className="flex flex-col sm:flex-row justify-between items-start mb-4">
                       <div>
                         <h3 className="font-semibold text-lg text-gray-900">
                           {req.type.toUpperCase()} - {req.deptId ? getDeptName(req.deptId) : req.dept}
@@ -699,11 +760,11 @@ export default function ApprovalsPage() {
                         </p>
                         <p className="text-sm text-gray-600 font-semibold">Requested by: {req.requesterName}</p>
                         {req.alasan && (
-                          <p className="text-sm text-gray-600 mt-1">Alasan: {req.alasan}</p>
+                          <p className="text-sm text-gray-600 mt-1">Reason: {req.alasan}</p>
                         )}
                       </div>
                       <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium ${req.status === "approved"
+                        className={`mt-2 sm:mt-0 px-3 py-1 rounded-full text-xs font-medium ${req.status === "approved"
                             ? "bg-green-100 text-green-800"
                             : req.status === "manager_approved"
                               ? "bg-blue-100 text-blue-800"
@@ -727,13 +788,13 @@ export default function ApprovalsPage() {
                     {req.type === "overtime" && req.entries && (
                       <div className="mb-4">
                         <p className="text-sm font-medium text-gray-700 mb-2">Overtime Details:</p>
-                        {req.entries.map((entry, index) => (
+                        {req.entries.map((entry: any, index) => (
                           <div key={index} className="bg-gray-50 p-3 rounded-lg mb-2">
                             <p className="text-sm"><strong>Employee:</strong> {entry.employee.nama} ({entry.employee.nik})</p>
                             <p className="text-sm"><strong>Date:</strong> {entry.tanggal}</p>
                             <p className="text-sm"><strong>Time:</strong> {entry.jamMulai} - {entry.jamSelesai}</p>
+                            <p className="text-sm"><strong>Break:</strong> {entry.breakTime} Menit</p>
                             <p className="text-sm"><strong>Total Hours:</strong> {entry.totalJam} hours</p>
-                            <p className="text-sm"><strong>Break Time:</strong> {entry.breakTime} minutes</p>
                           </div>
                         ))}
                       </div>
@@ -744,28 +805,28 @@ export default function ApprovalsPage() {
                         <div className="mb-4">
                             <p className="text-sm font-medium text-gray-700 mb-2">Permission to Leave Details:</p>
                             <div className="bg-gray-50 p-3 rounded-lg space-y-2">
-                                <p className="text-sm"><strong>Pengajuan Untuk:</strong> {req.jenisPengajuan === "diri-sendiri" ? "Diri Sendiri" : "Anggota Tim"}</p>
-                                <p className="text-sm"><strong>Keperluan:</strong> {req.keperluan}</p>
-                                <p className="text-sm"><strong>Penjelasan:</strong> {req.penjelasan}</p>
-                                <p className="text-sm"><strong>Tanggal:</strong> {req.tanggal}</p>
-                                <p className="text-sm"><strong>Jenis Izin:</strong> {req.jenisIzin}</p>
+                                <p className="text-sm"><strong>Request for:</strong> {req.jenisPengajuan === "diri-sendiri" ? "Self" : "Team Member"}</p>
+                                <p className="text-sm"><strong>Purpose:</strong> {req.keperluan}</p>
+                                <p className="text-sm"><strong>Explanation:</strong> {req.penjelasan}</p>
+                                <p className="text-sm"><strong>Date:</strong> {req.tanggal}</p>
+                                <p className="text-sm"><strong>Leave Type:</strong> {req.jenisIzin}</p>
                                 {(req.jenisIzin === "meninggalkan-kantor" || req.jenisIzin === "datang-terlambat") && (
-                                    <p className="text-sm"><strong>Waktu Mulai:</strong> {req.waktuMulai}</p>
+                                    <p className="text-sm"><strong>Start Time:</strong> {req.waktuMulai}</p>
                                 )}
                                 {(req.jenisIzin === "meninggalkan-kantor" || req.jenisIzin === "pulang-lebih-awal") && (
-                                    <p className="text-sm"><strong>Waktu Selesai:</strong> {req.waktuSelesai}</p>
+                                    <p className="text-sm"><strong>End Time:</strong> {req.waktuSelesai}</p>
                                 )}
-                                <p className="text-sm"><strong>Menggunakan Kendaraan:</strong> {req.menggunakanKendaraan ? "Ya" : "Tidak"}</p>
+                                <p className="text-sm"><strong>Using Vehicle:</strong> {req.menggunakanKendaraan ? "Yes" : "No"}</p>
                                 {req.menggunakanKendaraan && (
                                     <>
-                                        <p className="text-sm"><strong>Nama Supir:</strong> {req.namaSupir}</p>
-                                        <p className="text-sm"><strong>Plat Nomor:</strong> {req.platNomor}</p>
+                                        <p className="text-sm"><strong>Driver Name:</strong> {req.namaSupir}</p>
+                                        <p className="text-sm"><strong>Plate Number:</strong> {req.platNomor}</p>
                                     </>
                                 )}
-                                <p className="text-sm"><strong>Bawa Rekan:</strong> {req.bawaRekan ? "Ya" : "Tidak"}</p>
+                                <p className="text-sm"><strong>Bringing Colleague:</strong> {req.bawaRekan ? "Yes" : "No"}</p>
                                 {req.bawaRekan && req.rekan && req.rekan.length > 0 && (
                                     <div className="mt-2">
-                                        <p className="text-sm font-semibold">Daftar Rekan:</p>
+                                        <p className="text-sm font-semibold">Colleagues List:</p>
                                         <ul className="list-disc list-inside text-sm ml-4">
                                             {req.rekan.map((r, i) => (
                                                 <li key={i}>{r.nama} ({r.nik}) - {r.dept}</li>
@@ -850,7 +911,7 @@ export default function ApprovalsPage() {
                                   rel="noopener noreferrer"
                                   className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                                 >
-                                  Lihat MC
+                                  View MC
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
                                     <path d="M11 3a1 1 0 100 2h3.586l-7.293 7.293a1 1 0 101.414 1.414L16 6.414V10a1 1 0 102 0V4a1 1 0 00-1-1h-6z" />
                                     <path d="M4 12a1 1 0 00-1 1v2a2 2 0 002 2h2a1 1 0 000-2H5v-2a1 1 0 00-1-1z" />
@@ -869,27 +930,27 @@ export default function ApprovalsPage() {
                       <div className="mb-4">
                         <p className="text-sm font-medium text-gray-700 mb-2">Reimbursement Details:</p>
                         <div className="bg-gray-50 p-3 rounded-lg space-y-2">
-                          <p className="text-sm"><strong>Alasan:</strong> {req.alasan}</p>
+                          <p className="text-sm"><strong>Reason:</strong> {req.alasan}</p>
 
-                          <h4 className="font-semibold text-gray-800 mt-4">Daftar Item:</h4>
+                          <h4 className="font-semibold text-gray-800 mt-4">Item List:</h4>
                           {req.items && req.items.length > 0 ? (
                             <ul className="list-disc list-inside ml-4 space-y-1">
                               {req.items.map((item, index) => (
                                 <li key={item.id || index} className="text-sm">
-                                  {item.namaItem} - Rp {item.harga.toLocaleString('id-ID')}
+                                  {item.namaItem} - Rp {item.harga?.toLocaleString('id-ID')}
                                   {item.deskripsi && <span className="text-gray-500 italic ml-2">({item.deskripsi})</span>}
                                 </li>
                               ))}
                             </ul>
                           ) : (
-                            <p className="text-sm italic text-gray-500">Tidak ada item yang terdaftar.</p>
+                            <p className="text-sm italic text-gray-500">No items listed.</p>
                           )}
 
                           <div className="text-right mt-4 pt-2 border-t border-gray-200">
-                            <h4 className="text-base font-bold text-gray-900">Total Biaya: Rp {req.totalHarga?.toLocaleString('id-ID')}</h4>
+                            <h4 className="text-base font-bold text-gray-900">Total Cost: Rp {req.totalHarga?.toLocaleString('id-ID')}</h4>
                           </div>
 
-                          <h4 className="font-semibold text-gray-800 mt-4">Nota Terunggah:</h4>
+                          <h4 className="font-semibold text-gray-800 mt-4">Uploaded Receipts:</h4>
                           {req.notaUrls && req.notaUrls.length > 0 ? (
                             <div className="flex flex-wrap gap-2">
                               {req.notaUrls.map((url, index) => (
@@ -900,7 +961,7 @@ export default function ApprovalsPage() {
                                   rel="noopener noreferrer"
                                   className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
                                 >
-                                  Lihat Nota #{index + 1}
+                                  View Receipt #{index + 1}
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-1" viewBox="0 0 20 20" fill="currentColor">
                                     <path d="M11 3a1 1 0 100 2h3.586l-7.293 7.293a1 1 0 101.414 1.414L16 6.414V10a1 1 0 102 0V4a1 1 0 00-1-1h-6z" />
                                     <path d="M4 12a1 1 0 00-1 1v2a2 2 0 002 2h2a1 1 0 000-2H5v-2a1 1 0 00-1-1z" />
@@ -909,7 +970,7 @@ export default function ApprovalsPage() {
                               ))}
                             </div>
                           ) : (
-                            <p className="text-sm italic text-gray-500">Tidak ada nota yang terunggah.</p>
+                            <p className="text-sm italic text-gray-500">No receipts uploaded.</p>
                           )}
                         </div>
                       </div>
@@ -961,7 +1022,7 @@ export default function ApprovalsPage() {
                               )}
                               {step.comments && (
                                 <div className="mt-1 p-1 bg-white rounded text-gray-700">
-                                  <strong>Komentar:</strong> {step.comments}
+                                  <strong>Comment:</strong> {step.comments}
                                 </div>
                               )}
                             </div>
@@ -976,13 +1037,13 @@ export default function ApprovalsPage() {
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleApprovalAction(req.id, "approved")}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition"
+                            className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition"
                           >
                             Approve
                           </button>
                           <button
                             onClick={() => handleApprovalAction(req.id, "rejected")}
-                            className="px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition"
+                            className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg font-medium hover:bg-red-700 transition"
                           >
                             Reject
                           </button>

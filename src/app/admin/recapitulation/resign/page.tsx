@@ -12,10 +12,10 @@ import FileSaver from "file-saver";
 // Interfaces
 interface UserData {
     uid: string;
-    nama: string;
+    name: string;
     role: string;
     dept: string;
-    jabatan: string;
+    position: string;
 }
 
 interface ResignRequest {
@@ -27,11 +27,11 @@ interface ResignRequest {
     status: string;
     approvalFlow: any[];
     deptId?: string;
-    reason: string; // Diperbaiki: Menggunakan 'alasan'
-    resignationDate: string; // Diperbaiki: Menggunakan 'resignationDate'
+    reason: string;
+    resignationDate: string;
 }
 
-const ResignRecapitulationPage: React.FC = () => {
+const ResignationRecapitulationPage: React.FC = () => {
     const [user, setUser] = useState<UserData | null>(null);
     const [allResignData, setAllResignData] = useState<ResignRequest[]>([]);
     const [resignData, setResignData] = useState<ResignRequest[]>([]);
@@ -41,6 +41,7 @@ const ResignRecapitulationPage: React.FC = () => {
     const [departments, setDepartments] = useState<string[]>([]);
     const [deptIdToName, setDeptIdToName] = useState<Map<string, string>>(new Map());
     const [selectedDept, setSelectedDept] = useState<string>("");
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const router = useRouter();
 
     const safeToDate = (value: Timestamp | string): Date | null => {
@@ -148,7 +149,9 @@ const ResignRecapitulationPage: React.FC = () => {
 
                 let deptValid = true;
                 if (selectedDept && selectedDept !== "All Departments") {
-                    deptValid = deptIdToName.get(form.deptId as string) === selectedDept;
+                    const formDeptId = form.deptId || user?.dept;
+                    const formDeptName = deptIdToName.get(formDeptId as string);
+                    deptValid = formDeptName === selectedDept;
                 }
 
                 return startValid && endValid && deptValid;
@@ -157,19 +160,24 @@ const ResignRecapitulationPage: React.FC = () => {
         };
 
         applyFilters();
-    }, [allResignData, startDate, endDate, selectedDept, deptIdToName]);
+    }, [allResignData, startDate, endDate, selectedDept, deptIdToName, user]);
 
     const handleExport = () => {
-        const dataToExport = resignData.map((form, index) => ({
-            "No": index + 1,
-            "Form ID": form.id,
-            "Requester Name": form.requesterName,
-            "Date Submitted": safeToDate(form.createdAt)?.toLocaleDateString('id-ID'),
-            "Department": deptIdToName.get(form.deptId as string),
-            "Reason": form.reason, // Diperbaiki: Menggunakan 'alasan'
-            "Effective Date": form.resignationDate, // Diperbaiki: Menggunakan 'resignationDate'
-            "Final Status": formatStatusText(getFinalStatus(form.approvalFlow)),
-        }));
+        const dataToExport = resignData.map((form, index) => {
+            const formDeptId = form.deptId || user?.dept;
+            const departmentName = deptIdToName.get(formDeptId as string) || "N/A";
+
+            return {
+                "No": index + 1,
+                "Form ID": form.id,
+                "Requester Name": form.requesterName,
+                "Date Submitted": safeToDate(form.createdAt)?.toLocaleDateString('en-US'),
+                "Department": departmentName,
+                "Reason": form.reason,
+                "Effective Date": form.resignationDate,
+                "Final Status": formatStatusText(getFinalStatus(form.approvalFlow)),
+            };
+        });
 
         const worksheet = XLSX.utils.json_to_sheet(dataToExport);
         const workbook = XLSX.utils.book_new();
@@ -206,8 +214,15 @@ const ResignRecapitulationPage: React.FC = () => {
 
     return (
         <div className="min-h-screen flex bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
+            {/* Sidebar Overlay */}
+            {isSidebarOpen && (
+                <div 
+                    className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
+                    onClick={() => setIsSidebarOpen(false)}
+                ></div>
+            )}
             {/* Sidebar */}
-            <div className="w-64 bg-white shadow-lg">
+            <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0`}>
                 <div className="p-4 border-b border-green-100">
                     <div className="flex items-center justify-center mb-4">
                         <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
@@ -248,10 +263,18 @@ const ResignRecapitulationPage: React.FC = () => {
                 {/* Header */}
                 <header className="bg-white shadow-sm border-b border-green-100">
                     <div className="flex items-center justify-between p-4">
+                        <button 
+                            className="md:hidden p-2 text-gray-600 hover:text-gray-900 transition"
+                            onClick={() => setIsSidebarOpen(true)}
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                            </svg>
+                        </button>
                         <h1 className="text-2xl font-bold text-gray-900">Resignation Recapitulation</h1>
                         <div className="flex items-center space-x-4">
                             <div className="text-right">
-                                <p className="font-medium text-gray-900">Hello, {user?.nama}</p>
+                                <p className="font-medium text-gray-900">Hello, {user?.name}</p>
                                 <p className="text-sm text-gray-500 capitalize">{user?.role}</p>
                             </div>
                         </div>
@@ -295,22 +318,26 @@ const ResignRecapitulationPage: React.FC = () => {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {resignData.map((form, index) => (
-                                            <tr key={form.id} className="border-b border-gray-100 hover:bg-green-50">
-                                                <td className="py-3 px-4 text-sm text-gray-600">{index + 1}</td>
-                                                <td className="py-3 px-4 text-sm font-medium text-gray-900">{form.id}</td>
-                                                <td className="py-3 px-4 text-sm text-gray-600">{form.requesterName}</td>
-                                                <td className="py-3 px-4 text-sm text-gray-600">{safeToDate(form.createdAt)?.toLocaleDateString('id-ID')}</td>
-                                                <td className="py-3 px-4 text-sm text-gray-600">{deptIdToName.get(form.deptId as string)}</td>
-                                                <td className="py-3 px-4 text-sm text-gray-600">{form.reason}</td> {/* Diperbaiki */}
-                                                <td className="py-3 px-4 text-sm text-gray-600">{form.resignationDate}</td> {/* Diperbaiki */}
-                                                <td className="py-3 px-4">
-                                                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(getFinalStatus(form.approvalFlow))}`}>
-                                                        {formatStatusText(getFinalStatus(form.approvalFlow))}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))}
+                                        {resignData.map((form, index) => {
+                                            const formDeptId = form.deptId || user?.dept;
+                                            const departmentName = deptIdToName.get(formDeptId as string) || "N/A";
+                                            return (
+                                                <tr key={form.id} className="border-b border-gray-100 hover:bg-green-50">
+                                                    <td className="py-3 px-4 text-sm text-gray-600">{index + 1}</td>
+                                                    <td className="py-3 px-4 text-sm font-medium text-gray-900">{form.id}</td>
+                                                    <td className="py-3 px-4 text-sm text-gray-600">{form.requesterName}</td>
+                                                    <td className="py-3 px-4 text-sm text-gray-600">{safeToDate(form.createdAt)?.toLocaleDateString('en-US')}</td>
+                                                    <td className="py-3 px-4 text-sm text-gray-600">{departmentName}</td>
+                                                    <td className="py-3 px-4 text-sm text-gray-600">{form.reason}</td>
+                                                    <td className="py-3 px-4 text-sm text-gray-600">{form.resignationDate}</td>
+                                                    <td className="py-3 px-4">
+                                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(getFinalStatus(form.approvalFlow))}`}>
+                                                            {formatStatusText(getFinalStatus(form.approvalFlow))}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             ) : (
@@ -326,4 +353,4 @@ const ResignRecapitulationPage: React.FC = () => {
     );
 };
 
-export default ResignRecapitulationPage;
+export default ResignationRecapitulationPage;

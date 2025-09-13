@@ -8,7 +8,7 @@ import { doc, setDoc, serverTimestamp, collection, getDocs, query, where, getDoc
 import { useAuthState } from "react-firebase-hooks/auth";
 import Swal from 'sweetalert2';
 
-// Interfaces (Pastikan ini sesuai dengan struktur data Anda di Firestore)
+// Interfaces (Ensure these match your Firestore data structure)
 interface UserData {
     uid: string;
     email: string | null;
@@ -16,6 +16,7 @@ interface UserData {
     nik: string;
     dept: string;
     jabatan: string;
+    role: string;
 }
 
 interface Employee {
@@ -39,6 +40,7 @@ const LeaveRequestPage: React.FC = () => {
     const router = useRouter();
     const [authUser] = useAuthState(auth);
     const [userProfile, setUserProfile] = useState<UserData | null>(null);
+    const [managerData, setManagerData] = useState<UserData | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [employees, setEmployees] = useState<Employee[]>([]);
     const [filteredEmployees, setFilteredEmployees] = useState<Employee[]>([]);
@@ -46,6 +48,7 @@ const LeaveRequestPage: React.FC = () => {
     const [leaveEntries, setLeaveEntries] = useState<LeaveEntry[]>([]);
     const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
     const [isHalfDay, setIsHalfDay] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const [formData, setFormData] = useState({
         jenisPengajuan: "diri-sendiri",
@@ -74,8 +77,8 @@ const LeaveRequestPage: React.FC = () => {
                     console.error("User document not found!");
                     Swal.fire({
                         icon: 'error',
-                        title: 'Data Pengguna Tidak Ditemukan',
-                        text: 'Silakan hubungi dukungan teknis.'
+                        title: 'User Data Not Found',
+                        text: 'Please contact technical support.'
                     }).then(() => router.push("/"));
                 }
             } else {
@@ -84,6 +87,24 @@ const LeaveRequestPage: React.FC = () => {
         };
         fetchUserData();
     }, [authUser, router]);
+
+    // Fetch manager data based on user's department
+    useEffect(() => {
+        const fetchManagerData = async () => {
+            if (userProfile?.dept) {
+                const q = query(collection(db, "users"), where("dept", "==", userProfile.dept), where("role", "==", "manager"));
+                const querySnapshot = await getDocs(q);
+                if (!querySnapshot.empty) {
+                    const managerDoc = querySnapshot.docs[0];
+                    setManagerData({ ...managerDoc.data() as UserData, uid: managerDoc.id });
+                } else {
+                    console.warn(`No manager found for department: ${userProfile.dept}`);
+                    setManagerData(null);
+                }
+            }
+        };
+        fetchManagerData();
+    }, [userProfile]);
 
     // Load employees data
     useEffect(() => {
@@ -105,8 +126,8 @@ const LeaveRequestPage: React.FC = () => {
                 console.error("Error fetching employees:", error);
                 Swal.fire({
                     icon: 'error',
-                    title: 'Gagal Memuat Data',
-                    text: 'Terjadi kesalahan saat mengambil data karyawan.'
+                    title: 'Failed to Load Data',
+                    text: 'An error occurred while fetching employee data.'
                 });
             }
         };
@@ -131,7 +152,6 @@ const LeaveRequestPage: React.FC = () => {
     const handleHalfDayChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setIsHalfDay(e.target.checked);
         if (e.target.checked) {
-            // If half-day is checked, set end date to be the same as start date
             setDefaultEntry(prev => ({ ...prev, tanggalSelesai: prev.tanggalMulai, halfDayType: "am" }));
         } else {
             setDefaultEntry(prev => ({ ...prev, halfDayType: "" }));
@@ -150,7 +170,7 @@ const LeaveRequestPage: React.FC = () => {
         const { name, value } = e.target;
         setDefaultEntry(prev => {
             const newEntry = { ...prev, [name]: value };
-            
+
             if (name === "tanggalMulai" || name === "tanggalSelesai") {
                 const totalHari = calculateTotalDays(
                     name === "tanggalMulai" ? value : prev.tanggalMulai,
@@ -158,18 +178,18 @@ const LeaveRequestPage: React.FC = () => {
                 );
                 return { ...newEntry, totalHari };
             }
-            
+
             return newEntry;
         });
     };
 
     const handleEntryChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>, entryId: string) => {
         const { name, value } = e.target;
-        
+
         setLeaveEntries(prev => prev.map(entry => {
             if (entry.id === entryId) {
                 const updatedEntry = { ...entry, [name]: value };
-                
+
                 if (name === "tanggalMulai" || name === "tanggalSelesai") {
                     const totalHari = calculateTotalDays(
                         name === "tanggalMulai" ? value : entry.tanggalMulai,
@@ -177,7 +197,7 @@ const LeaveRequestPage: React.FC = () => {
                     );
                     return { ...updatedEntry, totalHari };
                 }
-                
+
                 return updatedEntry;
             }
             return entry;
@@ -188,8 +208,8 @@ const LeaveRequestPage: React.FC = () => {
         if (selectedEmployees.length === 0) {
             await Swal.fire({
                 icon: 'warning',
-                title: 'Peringatan',
-                text: 'Pilih minimal satu karyawan terlebih dahulu!'
+                title: 'Warning',
+                text: 'Please select at least one employee first!'
             });
             return;
         }
@@ -198,21 +218,24 @@ const LeaveRequestPage: React.FC = () => {
             .filter(empId => !leaveEntries.some(entry => entry.employee.id === empId))
             .map(empId => {
                 const emp = filteredEmployees.find(e => e.id === empId);
+                const halfDayType: "" | "am" | "pm" = isHalfDay
+                    ? (defaultEntry.halfDayType === "am" || defaultEntry.halfDayType === "pm" ? defaultEntry.halfDayType : "")
+                    : "";
                 return {
                     id: `entry-${Date.now()}-${empId}`,
                     employee: emp!,
                     tanggalMulai: defaultEntry.tanggalMulai,
                     tanggalSelesai: isHalfDay ? defaultEntry.tanggalMulai : defaultEntry.tanggalSelesai,
                     totalHari: isHalfDay ? 0.5 : calculateTotalDays(defaultEntry.tanggalMulai, defaultEntry.tanggalSelesai),
-                    halfDayType: isHalfDay ? defaultEntry.halfDayType : ""
-                };
+                    halfDayType
+                } as LeaveEntry;
             });
 
         if (newEntries.length === 0) {
             await Swal.fire({
                 icon: 'info',
-                title: 'Informasi',
-                text: 'Semua karyawan yang dipilih sudah ada di daftar.'
+                title: 'Information',
+                text: 'All selected employees are already on the list.'
             });
             return;
         }
@@ -225,6 +248,53 @@ const LeaveRequestPage: React.FC = () => {
         setLeaveEntries(prev => prev.filter(entry => entry.id !== entryId));
     };
 
+    // ** Pastikan fungsi ini ditempatkan di dalam komponen **
+    const sendApprovalEmail = async (formId: string) => {
+        try {
+            const response = await fetch('/api/send-full-broadcast', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ formId }),
+            });
+
+            if (!response.ok) {
+                const errorData = await response.text();
+                console.error('Failed to send approval email. Server responded with:', response.status, response.statusText);
+                console.error('Server response content:', errorData);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Email Sending Failed',
+                    text: 'An error occurred while sending the approval email. Please check server logs.',
+                });
+                return false;
+            }
+
+            const data = await response.json();
+            if (!data.success) {
+                console.error('API call was not successful:', data.message);
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Email Sending Failed',
+                    text: data.message,
+                });
+                return false;
+            }
+            
+            console.log('Email sent successfully:', data.message);
+            return true;
+        } catch (error) {
+            console.error("Error sending approval email:", error);
+            Swal.fire({
+                icon: 'error',
+                title: 'Network Error',
+                text: 'Could not connect to the server to send the email.',
+            });
+            return false;
+        }
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!userProfile) return;
@@ -232,8 +302,8 @@ const LeaveRequestPage: React.FC = () => {
         if (formData.jenisCuti === "") {
             await Swal.fire({
                 icon: 'warning',
-                title: 'Peringatan',
-                text: 'Pilih jenis cuti terlebih dahulu!'
+                title: 'Warning',
+                text: 'Please select a leave type first!'
             });
             return;
         }
@@ -241,19 +311,28 @@ const LeaveRequestPage: React.FC = () => {
         if (formData.jenisPengajuan === "untuk-anggota" && leaveEntries.length === 0) {
             await Swal.fire({
                 icon: 'warning',
-                title: 'Peringatan',
-                text: 'Tambahkan minimal satu karyawan untuk diajukan cuti!'
+                title: 'Warning',
+                text: 'Please add at least one employee to submit a leave request!'
+            });
+            return;
+        }
+
+        if (!managerData) {
+            await Swal.fire({
+                icon: 'error',
+                title: 'Error',
+                text: 'Manager data not found for your department. Please contact HR.'
             });
             return;
         }
 
         const confirmationResult = await Swal.fire({
-            title: 'Apakah Anda yakin?',
-            text: 'Anda akan mengajukan formulir cuti ini. Pastikan semua data sudah benar.',
+            title: 'Are you sure?',
+            text: 'You are about to submit this leave form. Please ensure all data is correct.',
             icon: 'question',
             showCancelButton: true,
-            confirmButtonText: 'Ya, Ajukan!',
-            cancelButtonText: 'Batal',
+            confirmButtonText: 'Yes, Submit!',
+            cancelButtonText: 'Cancel',
             confirmButtonColor: '#4CAF50',
             cancelButtonColor: '#d33',
         });
@@ -262,6 +341,17 @@ const LeaveRequestPage: React.FC = () => {
             setIsSubmitting(true);
             try {
                 const formId = `cuti-${Date.now()}`;
+
+                const approvalFlow = [
+                    {
+                        role: "manager",
+                        uid: managerData.uid,
+                        nama: managerData.nama,
+                        status: "pending",
+                        approvedAt: null,
+                        comments: ""
+                    }
+                ];
 
                 const leaveData = {
                     id: formId,
@@ -275,6 +365,7 @@ const LeaveRequestPage: React.FC = () => {
                     deptId: userProfile.dept,
                     createdAt: serverTimestamp(),
                     updatedAt: serverTimestamp(),
+                    approvalFlow,
                 };
 
                 if (formData.jenisPengajuan === "diri-sendiri") {
@@ -310,12 +401,13 @@ const LeaveRequestPage: React.FC = () => {
                 }
 
                 await setDoc(doc(db, "forms", formId), leaveData);
+                await sendApprovalEmail(formId);
 
                 Swal.fire({
                     icon: 'success',
-                    title: 'Berhasil!',
-                    text: 'Form cuti berhasil diajukan.',
-                    timer: 2000,
+                    title: 'Success!',
+                    text: 'Leave form submitted successfully. An approval request has been sent to your manager.',
+                    timer: 3000,
                     showConfirmButton: false
                 }).then(() => {
                     router.push("/dashboard");
@@ -325,8 +417,8 @@ const LeaveRequestPage: React.FC = () => {
                 console.error("Error submitting form:", error);
                 Swal.fire({
                     icon: 'error',
-                    title: 'Terjadi Kesalahan',
-                    text: 'Terjadi kesalahan saat menyimpan form. Silakan coba lagi.'
+                    title: 'An Error Occurred',
+                    text: 'An error occurred while saving the form. Please try again.'
                 });
             } finally {
                 setIsSubmitting(false);
@@ -343,7 +435,7 @@ const LeaveRequestPage: React.FC = () => {
     return (
         <div className="min-h-screen flex bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
             {/* Sidebar */}
-            <div className="w-64 bg-white shadow-lg">
+            <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transition-transform duration-300 ease-in-out md:static md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className="p-4 border-b border-green-100">
                     <div className="flex items-center justify-center mb-4">
                         <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
@@ -355,21 +447,21 @@ const LeaveRequestPage: React.FC = () => {
 
                 <nav className="p-4">
                     <div className="mb-2">
-                        <Link href="/forms" className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition mb-4">
+                        <Link href="/forms" className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition mb-4" onClick={() => setIsSidebarOpen(false)}>
                             <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                             </svg>
-                            Kembali ke Daftar Form
+                            Back to Forms List
                         </Link>
                     </div>
 
                     <div className="mb-6">
-                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Form Cuti</h2>
+                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Leave Form</h2>
                         <ul className="space-y-1">
                             <li>
                                 <div className="flex items-center p-2 rounded-lg bg-green-50 text-green-700 font-medium">
                                     <span className="mr-3">📝</span>
-                                    Isi Form
+                                    Fill Form
                                 </div>
                             </li>
                         </ul>
@@ -382,20 +474,31 @@ const LeaveRequestPage: React.FC = () => {
                 {/* Header */}
                 <header className="bg-white shadow-sm border-b border-green-100">
                     <div className="flex items-center justify-between p-4">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Form Cuti</h1>
-                            <p className="text-sm text-gray-500">Ajukan cuti untuk diri sendiri atau anggota tim</p>
+                        <div className="flex items-center">
+                            {/* Hamburger Menu for Mobile */}
+                            <button
+                                className="mr-4 text-gray-500 hover:text-gray-700 focus:outline-none md:hidden"
+                                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                                </svg>
+                            </button>
+                            <div>
+                                <h1 className="text-2xl font-bold text-gray-900">Leave Form</h1>
+                                <p className="text-sm text-gray-500">Submit a leave request for yourself or a team member</p>
+                            </div>
                         </div>
                         <div className="flex space-x-2">
                             <button className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">
-                                Simpan Draft
+                                Save Draft
                             </button>
                             <button
                                 onClick={handleSubmit}
                                 disabled={isSubmitting}
                                 className="px-4 py-2 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] disabled:opacity-50 transition"
                             >
-                                {isSubmitting ? "Mengajukan..." : "Ajukan Sekarang"}
+                                {isSubmitting ? "Submitting..." : "Submit Now"}
                             </button>
                         </div>
                     </div>
@@ -405,9 +508,9 @@ const LeaveRequestPage: React.FC = () => {
                 <main className="p-6">
                     <div className="bg-white rounded-xl shadow-md p-6 border border-green-100">
                         <form onSubmit={handleSubmit} className="space-y-6">
-                            {/* Jenis Pengajuan */}
+                            {/* Type of Request */}
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Jenis Pengajuan</h3>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Type of Request</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <label className="flex items-center p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-green-50 transition">
                                         <input
@@ -419,8 +522,8 @@ const LeaveRequestPage: React.FC = () => {
                                             className="text-green-600 focus:ring-green-500"
                                         />
                                         <div className="ml-3">
-                                            <span className="block text-sm font-medium text-gray-900">Untuk Diri Sendiri</span>
-                                            <span className="block text-sm text-gray-500">Ajukan cuti untuk diri sendiri</span>
+                                            <span className="block text-sm font-medium text-gray-900">For Myself</span>
+                                            <span className="block text-sm text-gray-500">Submit a leave request for yourself</span>
                                         </div>
                                     </label>
 
@@ -434,16 +537,16 @@ const LeaveRequestPage: React.FC = () => {
                                             className="text-green-600 focus:ring-green-500"
                                         />
                                         <div className="ml-3">
-                                            <span className="block text-sm font-medium text-gray-900">Untuk Anggota Tim</span>
-                                            <span className="block text-sm text-gray-500">Ajukan cuti untuk anggota tim/department</span>
+                                            <span className="block text-sm font-medium text-gray-900">For a Team Member</span>
+                                            <span className="block text-sm text-gray-500">Submit a leave request for a team/department member</span>
                                         </div>
                                     </label>
                                 </div>
                             </div>
                             
-                            {/* Jenis Cuti */}
+                            {/* Leave Type */}
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Jenis Cuti</h3>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Leave Type</h3>
                                 <select
                                     name="jenisCuti"
                                     value={formData.jenisCuti}
@@ -451,22 +554,21 @@ const LeaveRequestPage: React.FC = () => {
                                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                     required
                                 >
-                                    <option value="">Pilih Jenis Cuti</option>
-                                    <option value="cuti_tahunan">Cuti Tahunan</option>
-                                    <option value="cuti_sakit">Cuti Sakit</option>
-                                    <option value="cuti_melahirkan">Cuti Melahirkan</option>
-                                    <option value="cuti_menikah">Cuti Menikah</option>
-                                    <option value="cuti_lainnya">Cuti Lainnya</option>
+                                    <option value="">Select Leave Type</option>
+                                    <option value="cuti_tahunan">Annual Leave</option>
+                                    <option value="cuti_melahirkan">Maternity Leave</option>
+                                    <option value="cuti_menikah">Marriage Leave</option>
+                                    <option value="cuti_lainnya">Other Leave</option>
                                 </select>
                             </div>
 
-                            {/* Form untuk Diri Sendiri */}
+                            {/* Form for Self */}
                             {formData.jenisPengajuan === "diri-sendiri" && (
                                 <div>
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Detail Cuti</h3>
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Leave Details</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Mulai</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
                                             <input
                                                 type="date"
                                                 name="tanggalMulai"
@@ -477,7 +579,7 @@ const LeaveRequestPage: React.FC = () => {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Selesai</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
                                             <input
                                                 type="date"
                                                 name="tanggalSelesai"
@@ -489,7 +591,7 @@ const LeaveRequestPage: React.FC = () => {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Total Hari Cuti</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Total Leave Days</label>
                                             <div className="relative">
                                                 <input
                                                     type="text"
@@ -497,7 +599,7 @@ const LeaveRequestPage: React.FC = () => {
                                                     readOnly
                                                     className="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                 />
-                                                <span className="absolute right-3 top-2.5 text-gray-500">Hari</span>
+                                                <span className="absolute right-3 top-2.5 text-gray-500">Days</span>
                                             </div>
                                         </div>
                                     </div>
@@ -511,7 +613,7 @@ const LeaveRequestPage: React.FC = () => {
                                             className="mr-2 text-green-600 focus:ring-green-500"
                                         />
                                         <label htmlFor="halfDay" className="text-sm font-medium text-gray-700">
-                                            Cuti Setengah Hari
+                                            Half-Day Leave
                                         </label>
                                         {isHalfDay && (
                                             <select
@@ -520,18 +622,18 @@ const LeaveRequestPage: React.FC = () => {
                                                 onChange={handleDefaultEntryChange}
                                                 className="ml-4 p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                             >
-                                                <option value="am">Pagi (AM)</option>
-                                                <option value="pm">Siang (PM)</option>
+                                                <option value="am">Morning (AM)</option>
+                                                <option value="pm">Afternoon (PM)</option>
                                             </select>
                                         )}
                                     </div>
                                 </div>
                             )}
 
-                            {/* Form untuk Anggota Tim */}
+                            {/* Form for Team Member */}
                             {formData.jenisPengajuan === "untuk-anggota" && (
                                 <div>
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Tambah Anggota Tim</h3>
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Team Member</h3>
                                     <div className="bg-gray-50 p-4 rounded-lg mb-6">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                             <div>
@@ -542,7 +644,7 @@ const LeaveRequestPage: React.FC = () => {
                                                     onChange={handleChange}
                                                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                 >
-                                                    <option value="">Pilih Department</option>
+                                                    <option value="">Select Department</option>
                                                     {departments.map(dept => (
                                                         <option key={dept} value={dept}>{dept}</option>
                                                     ))}
@@ -551,7 +653,7 @@ const LeaveRequestPage: React.FC = () => {
 
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Pilih Karyawan
+                                                    Select Employee
                                                 </label>
                                                 <div className="max-h-60 overflow-y-auto border rounded-lg p-2">
                                                     {filteredEmployees.map((emp) => (
@@ -582,7 +684,7 @@ const LeaveRequestPage: React.FC = () => {
 
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Mulai Default</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Default Start Date</label>
                                                 <input
                                                     type="date"
                                                     name="tanggalMulai"
@@ -592,7 +694,7 @@ const LeaveRequestPage: React.FC = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Selesai Default</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Default End Date</label>
                                                 <input
                                                     type="date"
                                                     name="tanggalSelesai"
@@ -603,7 +705,7 @@ const LeaveRequestPage: React.FC = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Total Hari Default</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Default Total Days</label>
                                                 <div className="flex">
                                                     <input
                                                         type="text"
@@ -611,7 +713,7 @@ const LeaveRequestPage: React.FC = () => {
                                                         readOnly
                                                         className="flex-1 p-2.5 border border-gray-300 rounded-l-lg bg-gray-50 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                     />
-                                                    <span className="bg-gray-200 px-3 flex items-center rounded-r-lg text-gray-500">Hari</span>
+                                                    <span className="bg-gray-200 px-3 flex items-center rounded-r-lg text-gray-500">Days</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -625,7 +727,7 @@ const LeaveRequestPage: React.FC = () => {
                                                 className="mr-2 text-green-600 focus:ring-green-500"
                                             />
                                             <label htmlFor="halfDayTeam" className="text-sm font-medium text-gray-700">
-                                                Cuti Setengah Hari
+                                                Half-Day Leave
                                             </label>
                                             {isHalfDay && (
                                                 <select
@@ -634,8 +736,8 @@ const LeaveRequestPage: React.FC = () => {
                                                     onChange={handleDefaultEntryChange}
                                                     className="ml-4 p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                 >
-                                                    <option value="am">Pagi (AM)</option>
-                                                    <option value="pm">Siang (PM)</option>
+                                                    <option value="am">Morning (AM)</option>
+                                                    <option value="pm">Afternoon (PM)</option>
                                                 </select>
                                             )}
                                         </div>
@@ -646,17 +748,17 @@ const LeaveRequestPage: React.FC = () => {
                                             disabled={selectedEmployees.length === 0}
                                             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                                         >
-                                            + Tambahkan {selectedEmployees.length > 0 ? `(${selectedEmployees.length} karyawan)` : ""}
+                                            + Add {selectedEmployees.length > 0 ? `(${selectedEmployees.length} employees)` : ""}
                                         </button>
                                     </div>
 
-                                    {/* Daftar Karyawan yang Sudah Ditambahkan */}
+                                    {/* List of Added Employees */}
                                     {leaveEntries.length > 0 && (
                                         <div>
                                             <div className="flex justify-between items-center mb-4">
-                                                <h3 className="text-lg font-semibold text-gray-900">Daftar Cuti Anggota Tim</h3>
+                                                <h3 className="text-lg font-semibold text-gray-900">Team Member Leave List</h3>
                                                 <div className="text-sm font-medium text-gray-700">
-                                                    Total: {totalAllDays} Hari
+                                                    Total: {totalAllDays} Days
                                                 </div>
                                             </div>
 
@@ -664,13 +766,13 @@ const LeaveRequestPage: React.FC = () => {
                                                 <table className="w-full table-auto">
                                                     <thead className="bg-gray-50">
                                                         <tr>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Nama</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Name</th>
                                                             <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">NIK</th>
                                                             <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Dept</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Mulai</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Selesai</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Hari</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Aksi</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Start</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">End</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Days</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Action</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-gray-200">
@@ -698,7 +800,7 @@ const LeaveRequestPage: React.FC = () => {
                                                                     />
                                                                 </td>
                                                                 <td className="px-4 py-2 text-sm font-medium">
-                                                                    {entry.totalHari} Hari
+                                                                    {entry.totalHari} Days
                                                                 </td>
                                                                 <td className="px-4 py-2 text-sm">
                                                                     <button
@@ -706,7 +808,7 @@ const LeaveRequestPage: React.FC = () => {
                                                                         onClick={() => removeLeaveEntry(entry.id)}
                                                                         className="text-red-600 hover:text-red-800"
                                                                     >
-                                                                        Hapus
+                                                                        Remove
                                                                     </button>
                                                                 </td>
                                                             </tr>
@@ -719,15 +821,15 @@ const LeaveRequestPage: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Alasan Cuti */}
+                            {/* Leave Reason */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Alasan Cuti</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Reason for Leave</label>
                                 <textarea
                                     name="alasan"
                                     value={formData.alasan}
                                     onChange={handleChange}
                                     rows={3}
-                                    placeholder="Jelaskan alasan mengapa perlu mengambil cuti"
+                                    placeholder="Explain the reason for taking leave"
                                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                     required
                                 />
@@ -739,20 +841,20 @@ const LeaveRequestPage: React.FC = () => {
                                     href="/forms"
                                     className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
                                 >
-                                    Batal
+                                    Cancel
                                 </Link>
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
                                     className="px-6 py-2.5 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] disabled:opacity-50 transition"
                                 >
-                                    {isSubmitting ? "Mengajukan..." : "Ajukan Cuti"}
+                                    {isSubmitting ? "Submitting..." : "Submit Leave"}
                                 </button>
                             </div>
                         </form>
                     </div>
 
-                    {/* Informasi Section */}
+                    {/* Information Section */}
                     <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mt-6">
                         <div className="flex">
                             <div className="flex-shrink-0">
@@ -761,12 +863,12 @@ const LeaveRequestPage: React.FC = () => {
                                 </svg>
                             </div>
                             <div className="ml-3">
-                                <h3 className="text-sm font-medium text-yellow-800">Informasi Penting</h3>
+                                <h3 className="text-sm font-medium text-yellow-800">Important Information</h3>
                                 <div className="mt-2 text-sm text-yellow-700">
                                     <ul className="list-disc list-inside space-y-1">
-                                        <li>Ajukan cuti untuk diri sendiri atau untuk tim Anda</li>
-                                        <li>Anda dapat mengedit rentang tanggal per individu setelah menambahkan karyawan</li>
-                                        <li>Pastikan cuti telah mendapatkan persetujuan atasan langsung</li>
+                                        <li>Submit leave for yourself or for your team</li>
+                                        <li>You can edit the date range per individual after adding employees</li>
+                                        <li>Ensure the leave has been approved by your direct supervisor</li>
                                     </ul>
                                 </div>
                             </div>

@@ -6,24 +6,24 @@ import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { doc, setDoc, serverTimestamp, collection, getDocs, getDoc } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
-import Swal from 'sweetalert2'; // Tambahkan import SweetAlert2
+import Swal from 'sweetalert2';
 
-// --- Interfaces (Pastikan ini sesuai dengan struktur data Anda di Firestore) ---
+// --- Interfaces (Ensure these match your Firestore data structure) ---
 interface UserData {
     uid: string;
     email: string | null;
-    nama?: string; // Menjadikannya opsional
-    nik?: string; // Menjadikannya opsional
-    dept?: string; // Menjadikannya opsional
-    jabatan?: string; // Menjadikannya opsional
+    nama?: string;
+    nik?: string;
+    dept?: string;
+    jabatan?: string;
 }
 
 interface Employee {
     id: string;
-    nik?: string; // Menjadikannya opsional
-    nama?: string; // Menjadikannya opsional
-    dept?: string; // Menjadikannya opsional
-    jabatan?: string; // Menjadikannya opsional
+    nik?: string;
+    nama?: string;
+    dept?: string;
+    jabatan?: string;
 }
 
 interface SickLeaveEntry {
@@ -36,7 +36,7 @@ interface SickLeaveEntry {
     mcFileUrl?: string;
 }
 
-// --- Komponen Halaman ---
+// --- Page Component ---
 const SickLeaveRequestPage: React.FC = () => {
     const router = useRouter();
     const [authUser] = useAuthState(auth);
@@ -48,6 +48,7 @@ const SickLeaveRequestPage: React.FC = () => {
     const [sickLeaveEntries, setSickLeaveEntries] = useState<SickLeaveEntry[]>([]);
     const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
     const [mcFileForSelf, setMcFileForSelf] = useState<File | null>(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const [formData, setFormData] = useState({
         jenisPengajuan: "diri-sendiri",
@@ -61,7 +62,7 @@ const SickLeaveRequestPage: React.FC = () => {
         totalHari: 1,
     });
     
-    // --- Fungsi Helper ---
+    // --- Helper Functions ---
     const calculateTotalDays = (mulai: string, selesai: string): number => {
         const startDate = new Date(mulai);
         const endDate = new Date(selesai);
@@ -127,8 +128,8 @@ const SickLeaveRequestPage: React.FC = () => {
         if (selectedEmployees.length === 0) {
             await Swal.fire({
                 icon: 'warning',
-                title: 'Peringatan',
-                text: 'Pilih minimal satu karyawan terlebih dahulu!',
+                title: 'Warning',
+                text: 'Select at least one employee first!',
             });
             return;
         }
@@ -150,8 +151,8 @@ const SickLeaveRequestPage: React.FC = () => {
         if (newEntries.length === 0) {
             await Swal.fire({
                 icon: 'info',
-                title: 'Informasi',
-                text: 'Semua karyawan yang dipilih sudah ada di daftar!',
+                title: 'Information',
+                text: 'All selected employees are already in the list!',
             });
             return;
         }
@@ -161,10 +162,27 @@ const SickLeaveRequestPage: React.FC = () => {
     };
 
     const removeSickLeaveEntry = (entryId: string) => {
-        setSickLeaveEntries(prev => prev.filter(entry => entry.id !== entryId));
+        Swal.fire({
+            title: 'Delete this data?',
+            text: "You won't be able to revert this!",
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#d33',
+            cancelButtonColor: '#3085d6',
+            confirmButtonText: 'Yes, delete it!'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                setSickLeaveEntries(prev => prev.filter(entry => entry.id !== entryId));
+                Swal.fire(
+                    'Deleted!',
+                    'The sick leave data has been deleted.',
+                    'success'
+                );
+            }
+        });
     };
 
-    // --- Fungsi Unggah File ke Cloudinary ---
+    // --- Upload File to Cloudinary Function ---
     const uploadFileToCloudinary = async (file: File) => {
         const CLOUD_NAME = "due6kqddl";
         const UPLOAD_PRESET = "sick_leave_preset";
@@ -181,7 +199,7 @@ const SickLeaveRequestPage: React.FC = () => {
         return data.secure_url;
     };
 
-    // --- Fungsi Utama untuk Submit ---
+    // --- Main Submit Function ---
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!userProfile) {
@@ -189,7 +207,7 @@ const SickLeaveRequestPage: React.FC = () => {
             await Swal.fire({
                 icon: 'error',
                 title: 'Error',
-                text: 'Profil pengguna belum dimuat. Silakan coba lagi.'
+                text: 'User profile not loaded yet. Please try again.'
             });
             return;
         }
@@ -197,8 +215,8 @@ const SickLeaveRequestPage: React.FC = () => {
         if (formData.jenisPengajuan === "diri-sendiri" && !mcFileForSelf) {
             await Swal.fire({
                 icon: 'warning',
-                title: 'Peringatan',
-                text: 'Harap unggah surat dokter (MC) terlebih dahulu!'
+                title: 'Warning',
+                text: 'Please upload a doctor\'s note (MC) first!'
             });
             return;
         }
@@ -207,8 +225,8 @@ const SickLeaveRequestPage: React.FC = () => {
             if (sickLeaveEntries.length === 0) {
                 await Swal.fire({
                     icon: 'warning',
-                    title: 'Peringatan',
-                    text: 'Tambahkan minimal satu karyawan untuk diajukan cuti sakit!'
+                    title: 'Warning',
+                    text: 'Add at least one employee for the sick leave request!'
                 });
                 return;
             }
@@ -216,20 +234,20 @@ const SickLeaveRequestPage: React.FC = () => {
             if (hasMissingMc) {
                 await Swal.fire({
                     icon: 'warning',
-                    title: 'Peringatan',
-                    text: 'Semua anggota tim harus memiliki surat dokter yang diunggah.'
+                    title: 'Warning',
+                    text: 'All team members must have a doctor\'s note uploaded.'
                 });
                 return;
             }
         }
 
         const confirmationResult = await Swal.fire({
-            title: 'Ajukan Cuti Sakit?',
-            text: 'Anda akan mengirimkan formulir ini. Pastikan semua data sudah benar.',
+            title: 'Submit Sick Leave?',
+            text: 'You are about to submit this form. Make sure all data is correct.',
             icon: 'question',
             showCancelButton: true,
-            confirmButtonText: 'Ya, Ajukan!',
-            cancelButtonText: 'Batal',
+            confirmButtonText: 'Yes, Submit!',
+            cancelButtonText: 'Cancel',
             confirmButtonColor: '#4CAF50',
             cancelButtonColor: '#d33',
         });
@@ -292,15 +310,14 @@ const SickLeaveRequestPage: React.FC = () => {
                 updatedAt: serverTimestamp(),
             };
             
-            // Log data sebelum dikirim untuk debugging
-            console.log("Data yang akan dikirim ke Firestore:", sickLeaveData);
+            console.log("Data to be sent to Firestore:", sickLeaveData);
 
             await setDoc(doc(db, "forms", formId), sickLeaveData);
 
             await Swal.fire({
                 icon: 'success',
-                title: 'Berhasil!',
-                text: 'Form cuti sakit berhasil disimpan!',
+                title: 'Success!',
+                text: 'Sick leave form submitted successfully!',
                 timer: 2000,
                 showConfirmButton: false
             });
@@ -310,15 +327,15 @@ const SickLeaveRequestPage: React.FC = () => {
             console.error("Error submitting form:", error);
             await Swal.fire({
                 icon: 'error',
-                title: 'Terjadi Kesalahan',
-                text: 'Terjadi kesalahan saat menyimpan form. Silakan coba lagi.'
+                title: 'An Error Occurred',
+                text: 'An error occurred while saving the form. Please try again.'
             });
         } finally {
             setIsSubmitting(false);
         }
     };
     
-    // --- Efek samping untuk mengambil data pengguna dan karyawan ---
+    // --- Side effects to fetch user and employee data ---
     useEffect(() => {
         const fetchUserData = async () => {
             if (authUser) {
@@ -326,7 +343,6 @@ const SickLeaveRequestPage: React.FC = () => {
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data() as UserData;
-                    // Memastikan semua field memiliki nilai yang valid
                     setUserProfile({
                         uid: userData.uid || '',
                         email: userData.email || '',
@@ -356,19 +372,18 @@ const SickLeaveRequestPage: React.FC = () => {
             }) as Employee[];
             setEmployees(employeesList);
             const uniqueDepts = [...new Set(employeesList.map(emp => emp.dept))];
-            setDepartments(uniqueDepts.filter(dept => dept !== ''));
+            setDepartments(uniqueDepts.filter((dept): dept is string => typeof dept === 'string' && dept !== ''));
         };
 
         fetchUserData();
         fetchEmployees();
     }, [authUser, router]);
 
-    // Perbaikan bug: hanya tampilkan karyawan setelah departemen dipilih
     useEffect(() => {
         if (formData.deptFilter) {
             setFilteredEmployees(employees.filter(emp => emp.dept === formData.deptFilter));
         } else {
-            setFilteredEmployees([]); // <-- Perbaikan ada di sini
+            setFilteredEmployees([]);
         }
     }, [formData.deptFilter, employees]);
 
@@ -378,11 +393,11 @@ const SickLeaveRequestPage: React.FC = () => {
         return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">Loading user data...</div>;
     }
 
-    // --- Struktur JSX (Halaman Form) ---
+    // --- JSX Structure (Form Page) ---
     return (
-        <div className="min-h-screen flex bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
+        <div className="min-h-screen flex flex-col lg:flex-row bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
             {/* Sidebar */}
-            <div className="w-64 bg-white shadow-lg">
+            <div className={`fixed inset-y-0 left-0 w-64 bg-white shadow-lg z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 transition-transform duration-300 ease-in-out`}>
                 <div className="p-4 border-b border-green-100">
                     <div className="flex items-center justify-center mb-4">
                         <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
@@ -398,17 +413,17 @@ const SickLeaveRequestPage: React.FC = () => {
                             <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                             </svg>
-                            Kembali ke Daftar Form
+                            Back to Forms List
                         </Link>
                     </div>
 
                     <div className="mb-6">
-                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Form Cuti Sakit</h2>
+                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Sick Leave Form</h2>
                         <ul className="space-y-1">
                             <li>
                                 <div className="flex items-center p-2 rounded-lg bg-green-50 text-green-700 font-medium">
                                     <span className="mr-3">📝</span>
-                                    Isi Form
+                                    Fill Form
                                 </div>
                             </li>
                         </ul>
@@ -419,11 +434,21 @@ const SickLeaveRequestPage: React.FC = () => {
             {/* Main Content */}
             <div className="flex-1 overflow-auto">
                 {/* Header */}
-                <header className="bg-white shadow-sm border-b border-green-100">
-                    <div className="flex items-center justify-between p-4">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Form Cuti Sakit</h1>
-                            <p className="text-sm text-gray-500">Ajukan cuti sakit untuk diri sendiri atau anggota tim</p>
+                <header className="bg-white shadow-sm border-b border-green-100 p-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                            <button
+                                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                                className="lg:hidden p-2 mr-2 rounded-md text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-green-500"
+                            >
+                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
+                                </svg>
+                            </button>
+                            <div>
+                                <h1 className="text-xl md:text-2xl font-bold text-gray-900">Sick Leave Request Form</h1>
+                                <p className="text-xs md:text-sm text-gray-500">Request sick leave for yourself or a team member</p>
+                            </div>
                         </div>
                         <div className="flex space-x-2">
                             <button
@@ -431,19 +456,19 @@ const SickLeaveRequestPage: React.FC = () => {
                                 disabled={isSubmitting}
                                 className="px-4 py-2 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] disabled:opacity-50 transition"
                             >
-                                {isSubmitting ? "Mengajukan..." : "Ajukan Sekarang"}
+                                {isSubmitting ? "Submitting..." : "Submit Now"}
                             </button>
                         </div>
                     </div>
                 </header>
 
                 {/* Main Content */}
-                <main className="p-6">
-                    <div className="bg-white rounded-xl shadow-md p-6 border border-green-100">
+                <main className="p-4 md:p-6">
+                    <div className="bg-white rounded-xl shadow-md p-4 md:p-6 border border-green-100">
                         <form onSubmit={handleSubmit} className="space-y-6">
-                            {/* Jenis Pengajuan */}
+                            {/* Submission Type */}
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Jenis Pengajuan</h3>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Submission Type</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <label className="flex items-center p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-green-50 transition">
                                         <input
@@ -455,8 +480,8 @@ const SickLeaveRequestPage: React.FC = () => {
                                             className="text-green-600 focus:ring-green-500"
                                         />
                                         <div className="ml-3">
-                                            <span className="block text-sm font-medium text-gray-900">Untuk Diri Sendiri</span>
-                                            <span className="block text-sm text-gray-500">Ajukan cuti sakit untuk diri sendiri</span>
+                                            <span className="block text-sm font-medium text-gray-900">For Myself</span>
+                                            <span className="block text-sm text-gray-500">Request sick leave for myself</span>
                                         </div>
                                     </label>
 
@@ -470,18 +495,18 @@ const SickLeaveRequestPage: React.FC = () => {
                                             className="text-green-600 focus:ring-green-500"
                                         />
                                         <div className="ml-3">
-                                            <span className="block text-sm font-medium text-gray-900">Untuk Anggota Tim</span>
-                                            <span className="block text-sm text-gray-500">Ajukan cuti sakit untuk anggota tim/department</span>
+                                            <span className="block text-sm font-medium text-gray-900">For Team Members</span>
+                                            <span className="block text-sm text-gray-500">Request sick leave for team/department members</span>
                                         </div>
                                     </label>
                                 </div>
                             </div>
 
-                            {/* Form untuk Diri Sendiri */}
+                            {/* Form for Self */}
                             {formData.jenisPengajuan === "diri-sendiri" && (
                                 <>
                                     <div>
-                                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Unggah Surat Dokter (MC)</h3>
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload Doctor's Note (MC)</h3>
                                         <input
                                             type="file"
                                             accept=".pdf, .jpg, .jpeg, .png"
@@ -490,14 +515,14 @@ const SickLeaveRequestPage: React.FC = () => {
                                             required
                                         />
                                         {mcFileForSelf && (
-                                            <p className="mt-2 text-sm text-gray-600">File terpilih: {mcFileForSelf.name}</p>
+                                            <p className="mt-2 text-sm text-gray-600">Selected file: {mcFileForSelf.name}</p>
                                         )}
                                     </div>
                                     <div>
-                                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Detail Cuti Sakit</h3>
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Sick Leave Details</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Mulai</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
                                                 <input
                                                     type="date"
                                                     name="tanggalMulai"
@@ -508,7 +533,7 @@ const SickLeaveRequestPage: React.FC = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Selesai</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
                                                 <input
                                                     type="date"
                                                     name="tanggalSelesai"
@@ -519,7 +544,7 @@ const SickLeaveRequestPage: React.FC = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Total Hari Cuti</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Total Days</label>
                                                 <div className="relative">
                                                     <input
                                                         type="text"
@@ -527,7 +552,7 @@ const SickLeaveRequestPage: React.FC = () => {
                                                         readOnly
                                                         className="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                     />
-                                                    <span className="absolute right-3 top-2.5 text-gray-500">Hari</span>
+                                                    <span className="absolute right-3 top-2.5 text-gray-500">Days</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -535,10 +560,10 @@ const SickLeaveRequestPage: React.FC = () => {
                                 </>
                             )}
 
-                            {/* Form untuk Anggota Tim */}
+                            {/* Form for Team Members */}
                             {formData.jenisPengajuan === "untuk-anggota" && (
                                 <div>
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Tambah Anggota Tim</h3>
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Team Members</h3>
                                     <div className="bg-gray-50 p-4 rounded-lg mb-6">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                             <div>
@@ -549,7 +574,7 @@ const SickLeaveRequestPage: React.FC = () => {
                                                     onChange={handleChange}
                                                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                 >
-                                                    <option value="">Pilih Department</option>
+                                                    <option value="">Select Department</option>
                                                     {departments.map(dept => (
                                                         <option key={dept} value={dept}>{dept}</option>
                                                     ))}
@@ -558,7 +583,7 @@ const SickLeaveRequestPage: React.FC = () => {
 
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Pilih Karyawan
+                                                    Select Employee
                                                 </label>
                                                 <div className="max-h-60 overflow-y-auto border rounded-lg p-2">
                                                     {filteredEmployees.map((emp) => (
@@ -589,7 +614,7 @@ const SickLeaveRequestPage: React.FC = () => {
 
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Mulai Default</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Default Start Date</label>
                                                 <input
                                                     type="date"
                                                     name="tanggalMulai"
@@ -599,7 +624,7 @@ const SickLeaveRequestPage: React.FC = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Selesai Default</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Default End Date</label>
                                                 <input
                                                     type="date"
                                                     name="tanggalSelesai"
@@ -609,15 +634,15 @@ const SickLeaveRequestPage: React.FC = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Total Hari Default</label>
-                                                <div className="flex">
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Default Total Days</label>
+                                                <div className="relative">
                                                     <input
                                                         type="text"
                                                         value={defaultEntry.totalHari}
                                                         readOnly
-                                                        className="flex-1 p-2.5 border border-gray-300 rounded-l-lg bg-gray-50 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
+                                                        className="w-full p-2.5 border border-gray-300 rounded-lg bg-gray-50 focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                     />
-                                                    <span className="bg-gray-200 px-3 flex items-center rounded-r-lg text-gray-500">Hari</span>
+                                                    <span className="absolute right-3 top-2.5 text-gray-500">Days</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -628,17 +653,17 @@ const SickLeaveRequestPage: React.FC = () => {
                                             disabled={selectedEmployees.length === 0}
                                             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                                         >
-                                            + Tambahkan {selectedEmployees.length > 0 ? `(${selectedEmployees.length} karyawan)` : ""}
+                                            + Add {selectedEmployees.length > 0 ? `(${selectedEmployees.length} employees)` : ""}
                                         </button>
                                     </div>
 
-                                    {/* Daftar Karyawan yang Sudah Ditambahkan */}
+                                    {/* List of Added Employees */}
                                     {sickLeaveEntries.length > 0 && (
                                         <div>
                                             <div className="flex justify-between items-center mb-4">
-                                                <h3 className="text-lg font-semibold text-gray-900">Daftar Cuti Sakit Anggota Tim</h3>
+                                                <h3 className="text-lg font-semibold text-gray-900">Team Member Sick Leave List</h3>
                                                 <div className="text-sm font-medium text-gray-700">
-                                                    Total: {totalAllDays} Hari
+                                                    Total: {totalAllDays} Days
                                                 </div>
                                             </div>
 
@@ -646,14 +671,14 @@ const SickLeaveRequestPage: React.FC = () => {
                                                 <table className="w-full table-auto">
                                                     <thead className="bg-gray-50">
                                                         <tr>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Nama</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Name</th>
                                                             <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">NIK</th>
                                                             <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Dept</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Mulai</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Selesai</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Hari</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Unggah MC</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Aksi</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Start</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">End</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Days</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Upload MC</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Action</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-gray-200">
@@ -681,7 +706,7 @@ const SickLeaveRequestPage: React.FC = () => {
                                                                     />
                                                                 </td>
                                                                 <td className="px-4 py-2 text-sm font-medium">
-                                                                    {entry.totalHari} Hari
+                                                                    {entry.totalHari} Days
                                                                 </td>
                                                                 <td className="px-4 py-2 text-sm">
                                                                     <input
@@ -700,7 +725,7 @@ const SickLeaveRequestPage: React.FC = () => {
                                                                         onClick={() => removeSickLeaveEntry(entry.id)}
                                                                         className="text-red-600 hover:text-red-800"
                                                                     >
-                                                                        Hapus
+                                                                        Delete
                                                                     </button>
                                                                 </td>
                                                             </tr>
@@ -713,15 +738,15 @@ const SickLeaveRequestPage: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Alasan Cuti */}
+                            {/* Sick Leave Reason */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Alasan Cuti Sakit</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Sick Leave Reason</label>
                                 <textarea
                                     name="alasan"
                                     value={formData.alasan}
                                     onChange={handleChange}
                                     rows={3}
-                                    placeholder="Jelaskan alasan mengapa perlu mengambil cuti sakit"
+                                    placeholder="Explain the reason for taking sick leave"
                                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                     required
                                 />
@@ -733,20 +758,20 @@ const SickLeaveRequestPage: React.FC = () => {
                                     href="/forms"
                                     className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
                                 >
-                                    Batal
+                                    Cancel
                                 </Link>
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
                                     className="px-6 py-2.5 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] disabled:opacity-50 transition"
                                 >
-                                    {isSubmitting ? "Mengajukan..." : "Ajukan Cuti Sakit"}
+                                    {isSubmitting ? "Submitting..." : "Submit Sick Leave"}
                                 </button>
                             </div>
                         </form>
                     </div>
 
-                    {/* Informasi Section */}
+                    {/* Information Section */}
                     <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mt-6">
                         <div className="flex">
                             <div className="flex-shrink-0">
@@ -755,13 +780,13 @@ const SickLeaveRequestPage: React.FC = () => {
                                 </svg>
                             </div>
                             <div className="ml-3">
-                                <h3 className="text-sm font-medium text-yellow-800">Informasi Penting</h3>
+                                <h3 className="text-sm font-medium text-yellow-800">Important Information</h3>
                                 <div className="mt-2 text-sm text-yellow-700">
                                     <ul className="list-disc list-inside space-y-1">
-                                        <li>Form ini digunakan untuk mengajukan cuti sakit.</li>
-                                        <li>Wajib mengunggah surat dokter (MC) untuk setiap pengajuan cuti sakit, baik untuk diri sendiri maupun anggota tim.</li>
-                                        <li>Anda dapat mengedit rentang tanggal per individu setelah menambahkan karyawan.</li>
-                                        <li>Pastikan cuti telah mendapatkan persetujuan atasan langsung.</li>
+                                        <li>This form is used to request sick leave.</li>
+                                        <li>It is mandatory to upload a doctor's note (MC) for every sick leave request, both for yourself and for team members.</li>
+                                        <li>You can edit the date range per individual after adding employees.</li>
+                                        <li>Ensure the leave has been approved by your direct supervisor.</li>
                                     </ul>
                                 </div>
                             </div>

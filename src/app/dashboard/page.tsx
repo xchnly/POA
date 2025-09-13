@@ -255,6 +255,15 @@ const DashboardPage: React.FC = () => {
                   </Link>
                 </li>
                 <li>
+                  <Link href="/admin/settings" className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
+                    <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.82 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.82 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.82-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.82-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    Setting
+                  </Link>
+                </li>
+                <li>
                   <Link href="/register" className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-5 h-5 mr-3">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Zm0 3h.008v.008h-.008v-.008Z" />
@@ -305,13 +314,16 @@ const DashboardPage: React.FC = () => {
               <hr className="py-1"/>
               <ul className="space-y-2">
                 <li>
-                  <Link href="/dashboard" className="block p-2 rounded-md ">User</Link>
+                  <Link href="/admin/users" className="block p-2 rounded-md ">User</Link>
                 </li>
                 <li>
-                  <Link href="/forms" className="block p-2 rounded-md">Recapitulation</Link>
+                  <Link href="/admin/recapitulation" className="block p-2 rounded-md">Recapitulation</Link>
                 </li>
                 <li>
-                  <Link href="/approvals" className="block p-2 rounded-md">Register</Link>
+                  <Link href="/admin/settings" className="block p-2 rounded-md">Setting</Link>
+                </li>
+                <li>
+                  <Link href="/register" className="block p-2 rounded-md">Register</Link>
                 </li>
               </ul>
             </nav>

@@ -33,7 +33,7 @@ interface ReimbursementRequest {
     status: string;
     approvalFlow: any[];
     deptId?: string;
-    items: ReimbursementItem[]; // Telah diperbaiki dari 'reimbursementItems' menjadi 'items'
+    items: ReimbursementItem[];
     alasan: string;
     namaBank: string;
     nomorRekening: string;
@@ -50,6 +50,7 @@ const ReimburseRecapitulationPage: React.FC = () => {
     const [departments, setDepartments] = useState<string[]>([]);
     const [deptIdToName, setDeptIdToName] = useState<Map<string, string>>(new Map());
     const [selectedDept, setSelectedDept] = useState<string>("");
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const router = useRouter();
 
     const safeToDate = (value: Timestamp | string): Date | null => {
@@ -173,7 +174,7 @@ const ReimburseRecapitulationPage: React.FC = () => {
         let no = 1;
 
         reimburseData.forEach(form => {
-            (form.items || []).forEach(item => { // Telah diperbaiki dari 'reimbursementItems' menjadi 'items'
+            (form.items || []).forEach(item => {
                 dataToExport.push({
                     "No": no++,
                     "Form ID": form.id,
@@ -227,9 +228,9 @@ const ReimburseRecapitulationPage: React.FC = () => {
     let tableIndex = 0;
 
     return (
-        <div className="min-h-screen flex bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
+        <div className="min-h-screen flex flex-col lg:flex-row bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
             {/* Sidebar */}
-            <div className="w-64 bg-white shadow-lg">
+            <div className={`fixed inset-y-0 left-0 w-64 bg-white shadow-lg z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 transition-transform duration-300 ease-in-out`}>
                 <div className="p-4 border-b border-green-100">
                     <div className="flex items-center justify-center mb-4">
                         <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
@@ -256,7 +257,7 @@ const ReimburseRecapitulationPage: React.FC = () => {
                                 <li><Link href="/admin/recapitulation/reimburse" className="flex items-center p-2 rounded-lg bg-green-50 text-green-700 font-medium"><svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 2v-6m2 12H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>Recapitulation</Link></li>
                                 <li><Link href="/admin/recapitulation" className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
                                     <svg fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="w-5 h-5 mr-3">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
+                                        <path strokeLinecap="round" strokeLinecap="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" />
                                     </svg>
                                     Back To List
                                 </Link></li>
@@ -270,7 +271,20 @@ const ReimburseRecapitulationPage: React.FC = () => {
                 {/* Header */}
                 <header className="bg-white shadow-sm border-b border-green-100">
                     <div className="flex items-center justify-between p-4">
-                        <h1 className="text-2xl font-bold text-gray-900">Reimbursement Recapitulation</h1>
+                        <div className="flex items-center">
+                            <button
+                                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                                className="lg:hidden p-2 mr-2 rounded-md text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-green-500"
+                            >
+                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
+                                </svg>
+                            </button>
+                            <div>
+                                <h1 className="text-xl md:text-2xl font-bold text-gray-900">Reimbursement Recapitulation</h1>
+                                <p className="text-xs md:text-sm text-gray-500">View and export all reimbursement data</p>
+                            </div>
+                        </div>
                         <div className="flex items-center space-x-4">
                             <div className="text-right">
                                 <p className="font-medium text-gray-900">Hello, {user?.nama}</p>
@@ -322,7 +336,7 @@ const ReimburseRecapitulationPage: React.FC = () => {
                                     </thead>
                                     <tbody>
                                         {reimburseData.map(form =>
-                                            (form.items || []).map((item, index) => { // Telah diperbaiki dari 'reimbursementItems' menjadi 'items'
+                                            (form.items || []).map((item, index) => {
                                                 tableIndex++;
                                                 return (
                                                     <tr key={`${form.id}-${index}`} className="border-b border-gray-100 hover:bg-green-50">

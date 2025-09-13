@@ -45,6 +45,7 @@ const LaborRequestPage: React.FC = () => {
     const [userProfile, setUserProfile] = useState<UserData | null>(null);
     const [deptName, setDeptName] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false); // New state for sidebar
 
     const [formData, setFormData] = useState({
         tanggalDiperlukan: new Date().toISOString().split('T')[0],
@@ -76,14 +77,14 @@ const LaborRequestPage: React.FC = () => {
                         setDeptName(deptDocSnap.data().name);
                     } else {
                         console.error("Department document not found!");
-                        setDeptName("Tidak Ditemukan");
+                        setDeptName("Not Found");
                     }
                 } else {
                     console.error("User document not found!");
                     Swal.fire({
                         icon: 'error',
-                        title: 'Data Pengguna Tidak Ditemukan',
-                        text: 'Silakan hubungi dukungan teknis.'
+                        title: 'User Data Not Found',
+                        text: 'Please contact technical support.'
                     }).then(() => router.push("/"));
                 }
             } else {
@@ -127,8 +128,8 @@ const LaborRequestPage: React.FC = () => {
         if (gender.length === 0) {
             await Swal.fire({
                 icon: 'warning',
-                title: 'Peringatan',
-                text: 'Pilih minimal satu kriteria jenis kelamin!'
+                title: 'Warning',
+                text: 'Please select at least one gender criteria!'
             });
             return;
         }
@@ -136,19 +137,19 @@ const LaborRequestPage: React.FC = () => {
         if (formData.alasanMemerlukan === "Lainnya" && !formData.alasanLain.trim()) {
             await Swal.fire({
                 icon: 'warning',
-                title: 'Peringatan',
-                text: 'Mohon isi alasan lainnya.'
+                title: 'Warning',
+                text: 'Please fill in the other reason.'
             });
             return;
         }
 
         const confirmationResult = await Swal.fire({
-            title: 'Apakah Anda yakin?',
-            text: 'Anda akan mengajukan formulir permintaan tenaga kerja ini. Pastikan semua data sudah benar.',
+            title: 'Are you sure?',
+            text: 'You are about to submit this labor request form. Please ensure all data is correct.',
             icon: 'question',
             showCancelButton: true,
-            confirmButtonText: 'Ya, Ajukan!',
-            cancelButtonText: 'Batal',
+            confirmButtonText: 'Yes, Submit!',
+            cancelButtonText: 'Cancel',
             confirmButtonColor: '#4CAF50',
             cancelButtonColor: '#d33',
         });
@@ -185,8 +186,8 @@ const LaborRequestPage: React.FC = () => {
 
                 Swal.fire({
                     icon: 'success',
-                    title: 'Berhasil!',
-                    text: 'Formulir permintaan tenaga kerja berhasil diajukan.',
+                    title: 'Success!',
+                    text: 'Labor request form submitted successfully.',
                     timer: 2000,
                     showConfirmButton: false
                 }).then(() => {
@@ -197,8 +198,8 @@ const LaborRequestPage: React.FC = () => {
                 console.error("Error submitting form:", error);
                 Swal.fire({
                     icon: 'error',
-                    title: 'Terjadi Kesalahan',
-                    text: 'Terjadi kesalahan saat menyimpan formulir. Silakan coba lagi.'
+                    title: 'An Error Occurred',
+                    text: 'An error occurred while saving the form. Please try again.'
                 });
             } finally {
                 setIsSubmitting(false);
@@ -207,13 +208,13 @@ const LaborRequestPage: React.FC = () => {
     };
 
     if (!userProfile) {
-        return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">Memuat data pengguna...</div>;
+        return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">Loading user data...</div>;
     }
 
     return (
         <div className="min-h-screen flex bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
             {/* Sidebar */}
-            <div className="w-64 bg-white shadow-lg">
+            <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transition-transform duration-300 ease-in-out md:static md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className="p-4 border-b border-green-100">
                     <div className="flex items-center justify-center mb-4">
                         <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
@@ -225,21 +226,21 @@ const LaborRequestPage: React.FC = () => {
 
                 <nav className="p-4">
                     <div className="mb-2">
-                        <Link href="/forms" className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition mb-4">
+                        <Link href="/forms" className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition mb-4" onClick={() => setIsSidebarOpen(false)}>
                             <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                             </svg>
-                            Kembali ke Daftar Form
+                            Back to Forms List
                         </Link>
                     </div>
 
                     <div className="mb-6">
-                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Formulir Permintaan Tenaga Kerja</h2>
+                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Labor Request Form</h2>
                         <ul className="space-y-1">
                             <li>
                                 <div className="flex items-center p-2 rounded-lg bg-green-50 text-green-700 font-medium">
                                     <span className="mr-3">📝</span>
-                                    Isi Formulir
+                                    Fill Form
                                 </div>
                             </li>
                         </ul>
@@ -252,9 +253,18 @@ const LaborRequestPage: React.FC = () => {
                 {/* Header */}
                 <header className="bg-white shadow-sm border-b border-green-100">
                     <div className="flex items-center justify-between p-4">
+                        {/* Hamburger Menu for Mobile */}
+                        <button
+                            className="mr-4 text-gray-500 hover:text-gray-700 focus:outline-none md:hidden"
+                            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                        >
+                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                            </svg>
+                        </button>
                         <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Formulir Permintaan Tenaga Kerja</h1>
-                            <p className="text-sm text-gray-500">Ajukan permintaan tenaga kerja baru</p>
+                            <h1 className="text-2xl font-bold text-gray-900">Labor Request Form</h1>
+                            <p className="text-sm text-gray-500">Submit a new labor request</p>
                         </div>
                         <div className="flex space-x-2">
                             <button
@@ -262,7 +272,7 @@ const LaborRequestPage: React.FC = () => {
                                 disabled={isSubmitting}
                                 className="px-4 py-2 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] disabled:opacity-50 transition"
                             >
-                                {isSubmitting ? "Mengajukan..." : "Ajukan Sekarang"}
+                                {isSubmitting ? "Submitting..." : "Submit Now"}
                             </button>
                         </div>
                     </div>
@@ -274,10 +284,10 @@ const LaborRequestPage: React.FC = () => {
                         {/* General Info */}
                         <div className="bg-white rounded-xl shadow-md p-6 border border-green-100">
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Informasi Pemohon</h3>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Requester Information</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
-                                        <label htmlFor="requesterName" className="block text-sm font-medium text-gray-700 mb-1">Nama Pemohon</label>
+                                        <label htmlFor="requesterName" className="block text-sm font-medium text-gray-700 mb-1">Requester Name</label>
                                         <input
                                             type="text"
                                             id="requesterName"
@@ -287,7 +297,7 @@ const LaborRequestPage: React.FC = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label htmlFor="dept" className="block text-sm font-medium text-gray-700 mb-1">Departemen</label>
+                                        <label htmlFor="dept" className="block text-sm font-medium text-gray-700 mb-1">Department</label>
                                         <input
                                             type="text"
                                             id="dept"
@@ -300,12 +310,12 @@ const LaborRequestPage: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Kriteria Kebutuhan */}
+                        {/* Recruitment Criteria */}
                         <div className="bg-white rounded-xl shadow-md p-6 border border-green-100">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Kriteria Kebutuhan</h3>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Recruitment Criteria</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                 <div>
-                                    <label htmlFor="jumlahOrang" className="block text-sm font-medium text-gray-700 mb-1">Total Orang Diperlukan <span className="text-red-500">*</span></label>
+                                    <label htmlFor="jumlahOrang" className="block text-sm font-medium text-gray-700 mb-1">Total People Required <span className="text-red-500">*</span></label>
                                     <input
                                         type="number"
                                         name="jumlahOrang"
@@ -317,7 +327,7 @@ const LaborRequestPage: React.FC = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label htmlFor="tanggalDiperlukan" className="block text-sm font-medium text-gray-700 mb-1">Tanggal Diperlukan <span className="text-red-500">*</span></label>
+                                    <label htmlFor="tanggalDiperlukan" className="block text-sm font-medium text-gray-700 mb-1">Date Required <span className="text-red-500">*</span></label>
                                     <input
                                         type="date"
                                         name="tanggalDiperlukan"
@@ -328,7 +338,7 @@ const LaborRequestPage: React.FC = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label htmlFor="umurMaksimal" className="block text-sm font-medium text-gray-700 mb-1">Umur Maksimal <span className="text-red-500">*</span></label>
+                                    <label htmlFor="umurMaksimal" className="block text-sm font-medium text-gray-700 mb-1">Maximum Age <span className="text-red-500">*</span></label>
                                     <input
                                         type="number"
                                         name="umurMaksimal"
@@ -340,7 +350,7 @@ const LaborRequestPage: React.FC = () => {
                                     />
                                 </div>
                                 <div className="col-span-full">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Jenis Kelamin <span className="text-red-500">*</span></label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Gender <span className="text-red-500">*</span></label>
                                     <div className="flex gap-4">
                                         <div className="flex items-center">
                                             <input
@@ -352,7 +362,7 @@ const LaborRequestPage: React.FC = () => {
                                                 onChange={handleGenderChange}
                                                 className="h-4 w-4 text-green-600 border-gray-300 rounded"
                                             />
-                                            <label htmlFor="gender-male" className="ml-2 text-sm text-gray-700">Pria</label>
+                                            <label htmlFor="gender-male" className="ml-2 text-sm text-gray-700">Male</label>
                                         </div>
                                         <div className="flex items-center">
                                             <input
@@ -364,19 +374,19 @@ const LaborRequestPage: React.FC = () => {
                                                 onChange={handleGenderChange}
                                                 className="h-4 w-4 text-green-600 border-gray-300 rounded"
                                             />
-                                            <label htmlFor="gender-female" className="ml-2 text-sm text-gray-700">Wanita</label>
+                                            <label htmlFor="gender-female" className="ml-2 text-sm text-gray-700">Female</label>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Detail Kebutuhan */}
+                        {/* Request Details */}
                         <div className="bg-white rounded-xl shadow-md p-6 border border-green-100">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Detail Kebutuhan</h3>
+                            <h3 className="text-lg font-semibold text-gray-900 mb-4">Request Details</h3>
                             <div className="space-y-6">
                                 <div>
-                                    <label htmlFor="alasanMemerlukan" className="block text-sm font-medium text-gray-700 mb-1">Alasan Memerlukan <span className="text-red-500">*</span></label>
+                                    <label htmlFor="alasanMemerlukan" className="block text-sm font-medium text-gray-700 mb-1">Reason for Request <span className="text-red-500">*</span></label>
                                     <select
                                         name="alasanMemerlukan"
                                         value={formData.alasanMemerlukan}
@@ -384,14 +394,14 @@ const LaborRequestPage: React.FC = () => {
                                         className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                         required
                                     >
-                                        <option value="Posisi Baru">Posisi Baru</option>
-                                        <option value="Menggantikan Orang">Menggantikan Orang</option>
-                                        <option value="Penambahan Tenaga Kerja">Penambahan Tenaga Kerja</option>
-                                        <option value="Lainnya">Lainnya</option>
+                                        <option value="Posisi Baru">New Position</option>
+                                        <option value="Menggantikan Orang">Replacement</option>
+                                        <option value="Penambahan Tenaga Kerja">Additional Staff</option>
+                                        <option value="Lainnya">Other</option>
                                     </select>
                                     {showOtherReasonInput && (
                                         <div className="mt-4">
-                                            <label htmlFor="alasanLain" className="block text-sm font-medium text-gray-700 mb-1">Mohon berikan alasannya <span className="text-red-500">*</span></label>
+                                            <label htmlFor="alasanLain" className="block text-sm font-medium text-gray-700 mb-1">Please provide the reason <span className="text-red-500">*</span></label>
                                             <textarea
                                                 name="alasanLain"
                                                 value={formData.alasanLain}
@@ -404,7 +414,7 @@ const LaborRequestPage: React.FC = () => {
                                     )}
                                 </div>
                                 <div>
-                                    <label htmlFor="posisi" className="block text-sm font-medium text-gray-700 mb-1">Posisi / Jabatan <span className="text-red-500">*</span></label>
+                                    <label htmlFor="posisi" className="block text-sm font-medium text-gray-700 mb-1">Position / Title <span className="text-red-500">*</span></label>
                                     <input
                                         type="text"
                                         name="posisi"
@@ -415,7 +425,7 @@ const LaborRequestPage: React.FC = () => {
                                     />
                                 </div>
                                 <div>
-                                    <label htmlFor="tugasUtama" className="block text-sm font-medium text-gray-700 mb-1">Tugas Utama <span className="text-red-500">*</span></label>
+                                    <label htmlFor="tugasUtama" className="block text-sm font-medium text-gray-700 mb-1">Main Tasks <span className="text-red-500">*</span></label>
                                     <textarea
                                         name="tugasUtama"
                                         value={formData.tugasUtama}
@@ -426,7 +436,7 @@ const LaborRequestPage: React.FC = () => {
                                     />
                                 </div>
                                 <div className="col-span-full">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">Bahasa yang Diperlukan</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">Required Languages</label>
                                     <div className="flex gap-4">
                                         <div className="flex items-center">
                                             <input
@@ -467,13 +477,13 @@ const LaborRequestPage: React.FC = () => {
                                     </div>
                                 </div>
                                 <div>
-                                    <label htmlFor="persyaratanLain" className="block text-sm font-medium text-gray-700 mb-1">Persyaratan Lain</label>
+                                    <label htmlFor="persyaratanLain" className="block text-sm font-medium text-gray-700 mb-1">Other Requirements</label>
                                     <textarea
                                         name="persyaratanLain"
                                         value={formData.persyaratanLain}
                                         onChange={handleChange}
                                         rows={4}
-                                        placeholder="Opsional, seperti pengalaman kerja, sertifikasi, dsb."
+                                        placeholder="Optional, such as work experience, certifications, etc."
                                         className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                     />
                                 </div>
@@ -485,15 +495,16 @@ const LaborRequestPage: React.FC = () => {
                             <Link
                                 href="/forms"
                                 className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
+                                onClick={() => setIsSidebarOpen(false)}
                             >
-                                Batal
+                                Cancel
                             </Link>
                             <button
                                 type="submit"
                                 disabled={isSubmitting || gender.length === 0}
                                 className="px-6 py-2.5 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] disabled:opacity-50 transition"
                             >
-                                {isSubmitting ? "Mengajukan..." : "Ajukan Permintaan"}
+                                {isSubmitting ? "Submitting..." : "Submit Request"}
                             </button>
                         </div>
                     </form>
@@ -507,11 +518,11 @@ const LaborRequestPage: React.FC = () => {
                                 </svg>
                             </div>
                             <div className="ml-3">
-                                <h3 className="text-sm font-medium text-yellow-800">Informasi Penting</h3>
+                                <h3 className="text-sm font-medium text-yellow-800">Important Information</h3>
                                 <div className="mt-2 text-sm text-yellow-700">
                                     <ul className="list-disc list-inside space-y-1">
-                                        <li>Pastikan semua kriteria telah diisi dengan benar.</li>
-                                        <li>Permintaan ini akan diteruskan ke departemen HRD dan atasan Anda untuk ditinjau.</li>
+                                        <li>Ensure all criteria have been filled out correctly.</li>
+                                        <li>This request will be forwarded to the HRD department and your superior for review.</li>
                                     </ul>
                                 </div>
                             </div>

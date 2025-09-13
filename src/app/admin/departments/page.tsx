@@ -21,7 +21,7 @@ interface User {
   role: string;
   dept: string;
   email: string;
-  status?: string; // Made optional since it might not exist
+  status?: string;
   jabatan?: string;
 }
 
@@ -43,15 +43,16 @@ const DepartmentsPage = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [debugInfo, setDebugInfo] = useState<string>("");
   const [allUsersDebug, setAllUsersDebug] = useState<User[]>([]);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Load users dan departments
+  // Load users and departments
   useEffect(() => {
     const fetchData = async () => {
       try {
-        console.log("🔄 Memulai fetch data dari Firestore...");
-        setDebugInfo("Sedang mengambil data...");
+        console.log("🔄 Starting data fetch from Firestore...");
+        setDebugInfo("Fetching data...");
         
-        // 1. Fetch semua users dari koleksi "users" (TANPA FILTER APAPUN)
+        // 1. Fetch all users from the "users" collection (WITHOUT ANY FILTER)
         const allUsersQuery = collection(db, "users");
         const allUsersSnap = await getDocs(allUsersQuery);
         const allUsersList: User[] = allUsersSnap.docs.map((d) => ({
@@ -59,11 +60,11 @@ const DepartmentsPage = () => {
           ...d.data()
         } as User));
         
-        console.log("👥 Semua user dari Firestore:", allUsersList);
+        console.log("👥 All users from Firestore:", allUsersList);
         setAllUsersDebug(allUsersList);
         
-        // 2. Debug setiap user untuk melihat field role dan jabatan
-        console.log("🔍 Detail analisis setiap user:");
+        // 2. Debug each user to see the role and position fields
+        console.log("🔍 Detailed analysis of each user:");
         allUsersList.forEach(user => {
           console.log(`User: ${user.nama}`, {
             id: user.id,
@@ -75,15 +76,15 @@ const DepartmentsPage = () => {
           });
         });
 
-        // 3. Filter users yang bisa jadi manager (HAPUS FILTER STATUS)
+        // 3. Filter users who can be managers (REMOVE STATUS FILTER)
         const managerUsers = allUsersList.filter(user => {
-          // Skip users tanpa nama (data tidak valid)
+          // Skip users without a name (invalid data)
           if (!user.nama) {
-            console.log("❌ User tanpa nama, dilewati:", user);
+            console.log("❌ User without a name, skipped:", user);
             return false;
           }
           
-          // Cek role dan jabatan
+          // Check role and position
           const userRole = user.role ? user.role.toLowerCase().trim() : "";
           const userJabatan = user.jabatan ? user.jabatan.toLowerCase().trim() : "";
           
@@ -106,9 +107,9 @@ const DepartmentsPage = () => {
           return isManager;
         });
         
-        console.log("🎯 Manager users yang berhasil difilter:", managerUsers);
+        console.log("🎯 Filtered manager users:", managerUsers);
         setUsers(managerUsers);
-        setDebugInfo(`Total user: ${allUsersList.length}, Manager users: ${managerUsers.length}`);
+        setDebugInfo(`Total users: ${allUsersList.length}, Manager users: ${managerUsers.length}`);
 
         // 4. Fetch departments
         const deptSnap = await getDocs(collection(db, "departments"));
@@ -118,7 +119,7 @@ const DepartmentsPage = () => {
           const deptData = doc.data();
           console.log("🏢 Department data:", deptData);
           
-          // Hitung jumlah karyawan di department ini
+          // Calculate employee count in this department
           const employeesQuery = query(collection(db, "users"));
           const employeesSnap = await getDocs(employeesQuery);
           const employeesInDept = employeesSnap.docs.filter(empDoc => {
@@ -154,7 +155,7 @@ const DepartmentsPage = () => {
       const manager = users.find((u) => u.id === managerId);
       
       if (managerId === "") {
-        // Hapus manager dari department
+        // Remove manager from department
         await updateDoc(doc(db, "departments", deptId), {
           managerId: "",
           managerName: "",
@@ -169,9 +170,9 @@ const DepartmentsPage = () => {
           )
         );
         
-        alert("Manager berhasil dihapus dari departemen.");
+        alert("Manager successfully removed from the department.");
       } else if (manager) {
-        // Assign manager baru
+        // Assign new manager
         await updateDoc(doc(db, "departments", deptId), {
           managerId: manager.id,
           managerName: manager.nama,
@@ -191,11 +192,11 @@ const DepartmentsPage = () => {
           )
         );
         
-        alert(`Manager ${manager.nama} berhasil ditugaskan ke departemen.`);
+        alert(`Manager ${manager.nama} successfully assigned to the department.`);
       }
     } catch (error) {
       console.error("❌ Error assigning manager:", error);
-      alert("Terjadi kesalahan saat menetapkan manager.");
+      alert("An error occurred while assigning the manager.");
     }
   };
 
@@ -208,7 +209,7 @@ const DepartmentsPage = () => {
       );
       
       if (existingDept) {
-        alert("Departemen dengan nama tersebut sudah ada.");
+        alert("A department with that name already exists.");
         return;
       }
       
@@ -237,15 +238,15 @@ const DepartmentsPage = () => {
       
       setNewDeptName("");
       setShowAddForm(false);
-      alert("Departemen berhasil ditambahkan.");
+      alert("Department successfully added.");
     } catch (error) {
       console.error("❌ Error adding department:", error);
-      alert("Terjadi kesalahan saat menambahkan departemen.");
+      alert("An error occurred while adding the department.");
     }
   };
 
   const handleDeleteDepartment = async (deptId: string, deptName: string) => {
-    if (!confirm(`Apakah Anda yakin ingin menghapus departemen ${deptName}?`)) {
+    if (!confirm(`Are you sure you want to delete department ${deptName}?`)) {
       return;
     }
     
@@ -259,7 +260,7 @@ const DepartmentsPage = () => {
       });
       
       if (employeesInDept.length > 0) {
-        alert("Tidak dapat menghapus departemen yang masih memiliki karyawan aktif.");
+        alert("Cannot delete a department that still has active employees.");
         return;
       }
       
@@ -269,10 +270,10 @@ const DepartmentsPage = () => {
       // Update local state
       setDepartments(prev => prev.filter(dept => dept.id !== deptId));
       
-      alert("Departemen berhasil dihapus.");
+      alert("Department successfully deleted.");
     } catch (error) {
       console.error("❌ Error deleting department:", error);
-      alert("Terjadi kesalahan saat menghapus departemen.");
+      alert("An error occurred while deleting the department.");
     }
   };
 
@@ -280,6 +281,10 @@ const DepartmentsPage = () => {
     dept.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (dept.managerName && dept.managerName.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  const handleSidebarToggle = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
 
   if (loading) {
     return (
@@ -290,9 +295,52 @@ const DepartmentsPage = () => {
   }
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
-      {/* Sidebar */}
-      <div className="w-64 bg-white shadow-lg">
+    <div className="min-h-screen flex flex-col md:flex-row bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
+      {/* Sidebar - Mobile View */}
+      <div className={`fixed inset-y-0 left-0 z-50 md:hidden bg-white shadow-lg w-64 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out`}>
+        <div className="p-4 border-b border-green-100 flex justify-end">
+          <button onClick={handleSidebarToggle} className="text-gray-500 hover:text-gray-700 focus:outline-none">
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
+            </svg>
+          </button>
+        </div>
+        <div className="p-4 border-b border-green-100 text-center">
+          <div className="flex items-center justify-center mb-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
+              <span className="text-white font-bold text-xl">POA</span>
+            </div>
+          </div>
+          <h1 className="text-lg font-bold text-center text-gray-800">Prestova One Approval</h1>
+        </div>
+        <nav className="p-4">
+          <ul className="space-y-2">
+            <li>
+              <Link href="/dashboard" onClick={handleSidebarToggle} className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
+                <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to Dashboard
+              </Link>
+            </li>
+            <li>
+              <Link href="/admin/users" onClick={handleSidebarToggle} className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
+                <span className="mr-3">👥</span>
+                User & Employees
+              </Link>
+            </li>
+            <li>
+              <div className="flex items-center p-2 rounded-lg bg-green-50 text-green-700 font-medium">
+                <span className="mr-3">🏢</span>
+                Department
+              </div>
+            </li>
+          </ul>
+        </nav>
+      </div>
+
+      {/* Sidebar - Desktop View */}
+      <div className="hidden md:block w-64 bg-white shadow-lg">
         <div className="p-4 border-b border-green-100">
           <div className="flex items-center justify-center mb-4">
             <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
@@ -308,17 +356,17 @@ const DepartmentsPage = () => {
               <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
               </svg>
-              Kembali ke Dashboard
+              Back to Dashboard
             </Link>
           </div>
           
           <div className="mb-6">
-            <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Manajemen</h2>
+            <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Management</h2>
             <ul className="space-y-1">
               <li>
                 <Link href="/admin/users" className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition">
                   <span className="mr-3">👥</span>
-                  User & Karyawan
+                  User & Employees
                 </Link>
               </li>
               <li>
@@ -337,15 +385,22 @@ const DepartmentsPage = () => {
         {/* Header */}
         <header className="bg-white shadow-sm border-b border-green-100">
           <div className="flex items-center justify-between p-4">
+            <div className="md:hidden">
+              <button onClick={handleSidebarToggle} className="text-gray-500 hover:text-gray-700 focus:outline-none">
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                </svg>
+              </button>
+            </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Manajemen Departemen</h1>
-              <p className="text-sm text-gray-500">Kelola departemen dan tentukan manager untuk setiap departemen</p>
+              <h1 className="text-2xl font-bold text-gray-900">Department Management</h1>
+              <p className="text-sm text-gray-500">Manage departments and assign managers for each department</p>
             </div>
             <button
               onClick={() => setShowAddForm(true)}
               className="px-4 py-2 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] transition"
             >
-              + Tambah Departemen
+              + Add Department
             </button>
           </div>
         </header>
@@ -354,21 +409,21 @@ const DepartmentsPage = () => {
         <main className="p-6">
           {/* Enhanced Debug Info */}
           <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
-            <h3 className="text-sm font-medium text-yellow-800 mb-2">🔍 Informasi Debug Lengkap</h3>
-            <p className="text-xs text-yellow-700">Total user dari Firestore: {allUsersDebug.length}</p>
-            <p className="text-xs text-yellow-700">Manager users yang lolos filter: {users.length}</p>
-            <p className="text-xs text-yellow-700">Jumlah Departments: {departments.length}</p>
+            <h3 className="text-sm font-medium text-yellow-800 mb-2">🔍 Detailed Debug Information</h3>
+            <p className="text-xs text-yellow-700">Total users from Firestore: {allUsersDebug.length}</p>
+            <p className="text-xs text-yellow-700">Manager users that passed the filter: {users.length}</p>
+            <p className="text-xs text-yellow-700">Number of Departments: {departments.length}</p>
             <p className="text-xs text-yellow-700">{debugInfo}</p>
             
             <details className="mt-2">
-              <summary className="text-xs text-yellow-700 cursor-pointer font-medium">📋 Lihat SEMUA User dari Firestore</summary>
+              <summary className="text-xs text-yellow-700 cursor-pointer font-medium">📋 View ALL Users from Firestore</summary>
               <div className="text-xs bg-yellow-100 p-2 mt-1 overflow-auto max-h-60">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left p-1">Nama</th>
+                      <th className="text-left p-1">Name</th>
                       <th className="text-left p-1">Role</th>
-                      <th className="text-left p-1">Jabatan</th>
+                      <th className="text-left p-1">Position</th>
                       <th className="text-left p-1">Status</th>
                       <th className="text-left p-1">Dept</th>
                     </tr>
@@ -389,102 +444,102 @@ const DepartmentsPage = () => {
             </details>
             
             <details className="mt-2">
-              <summary className="text-xs text-yellow-700 cursor-pointer font-medium">✅ Manager Users (Yang Lolos Filter)</summary>
+              <summary className="text-xs text-yellow-700 cursor-pointer font-medium">✅ Filtered Manager Users</summary>
               <pre className="text-xs bg-yellow-100 p-2 mt-1 overflow-auto max-h-40">
                 {JSON.stringify(users, null, 2)}
               </pre>
             </details>
             
             <details className="mt-2">
-              <summary className="text-xs text-yellow-700 cursor-pointer">Lihat Detail Departments</summary>
+              <summary className="text-xs text-yellow-700 cursor-pointer">View Department Details</summary>
               <pre className="text-xs bg-yellow-100 p-2 mt-1 overflow-auto max-h-40">
                 {JSON.stringify(departments, null, 2)}
               </pre>
             </details>
           </div>
 
-          {/* Filter dan Pencarian */}
+          {/* Filter and Search */}
           <div className="bg-white rounded-xl shadow-md p-6 mb-6 border border-green-100">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cari Departemen</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Search Department</label>
                 <input
                   type="text"
-                  placeholder="Cari berdasarkan nama departemen atau manager..."
+                  placeholder="Search by department name or manager..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Total Departemen</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Total Departments</label>
                 <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-300">
-                  <span className="text-lg font-bold text-green-600">{filteredDepartments.length}</span> departemen
+                  <span className="text-lg font-bold text-green-600">{filteredDepartments.length}</span> departments
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Form Tambah Departemen */}
+          {/* Add Department Form */}
           {showAddForm && (
             <div className="bg-white rounded-xl shadow-md p-6 mb-6 border border-green-100">
-              <h2 className="text-xl font-semibold text-gray-900 mb-4">Tambah Departemen Baru</h2>
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">Add New Department</h2>
               
-              <form onSubmit={handleAddDepartment} className="flex gap-4 items-end">
-                <div className="flex-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nama Departemen</label>
+              <form onSubmit={handleAddDepartment} className="flex flex-col md:flex-row gap-4 items-end">
+                <div className="flex-1 w-full">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Department Name</label>
                   <input
                     type="text"
                     value={newDeptName}
                     onChange={(e) => setNewDeptName(e.target.value)}
-                    placeholder="Masukkan nama departemen"
+                    placeholder="Enter department name"
                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                     required
                   />
                 </div>
                 
-                <div className="flex space-x-3">
+                <div className="flex space-x-3 w-full md:w-auto">
                   <button
                     type="button"
                     onClick={() => {
                       setShowAddForm(false);
                       setNewDeptName("");
                     }}
-                    className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
+                    className="flex-1 md:flex-none px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
                   >
-                    Batal
+                    Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-6 py-2.5 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] transition"
+                    className="flex-1 md:flex-none px-6 py-2.5 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] transition"
                   >
-                    Simpan
+                    Save
                   </button>
                 </div>
               </form>
             </div>
           )}
 
-          {/* Tabel Departemen */}
+          {/* Department Table */}
           <div className="bg-white rounded-xl shadow-md p-6 border border-green-100">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Daftar Departemen</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Department List</h2>
             
             {filteredDepartments.length === 0 ? (
               <div className="text-center py-8">
                 <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-4m-4 0H9m4 0V9a2 2 0 00-2-2H9a2 2 0 00-2 2v12m4 0V9" />
                 </svg>
-                <p className="text-gray-500">Tidak ada data departemen yang ditemukan.</p>
+                <p className="text-gray-500">No department data found.</p>
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full table-auto">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Nama Departemen</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Jumlah Karyawan</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Department Name</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Employee Count</th>
                       <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Manager</th>
-                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Aksi</th>
+                      <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
@@ -493,7 +548,7 @@ const DepartmentsPage = () => {
                         <td className="px-4 py-3 text-sm font-medium text-gray-900">{dept.name}</td>
                         <td className="px-4 py-3 text-sm text-gray-600">
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {dept.employeeCount} orang
+                            {dept.employeeCount} people
                           </span>
                         </td>
                         <td className="px-4 py-3 text-sm">
@@ -502,7 +557,7 @@ const DepartmentsPage = () => {
                             onChange={(e) => handleAssignManager(dept.id, e.target.value)}
                             className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                           >
-                            <option value="">-- Pilih Manager --</option>
+                            <option value="">-- Select Manager --</option>
                             {users.map((user) => (
                               <option key={user.id} value={user.id}>
                                 {user.nama} ({user.nik}) - {user.role} {user.jabatan && `- ${user.jabatan}`}
@@ -520,9 +575,9 @@ const DepartmentsPage = () => {
                             onClick={() => handleDeleteDepartment(dept.id, dept.name)}
                             disabled={(dept.employeeCount ?? 0) > 0}
                             className="text-red-600 hover:text-red-800 disabled:text-gray-400 disabled:cursor-not-allowed"
-                            title={(dept.employeeCount ?? 0) > 0 ? "Tidak dapat menghapus departemen yang masih memiliki karyawan" : "Hapus departemen"}
+                            title={(dept.employeeCount ?? 0) > 0 ? "Cannot delete department that still has employees" : "Delete department"}
                           >
-                            🗑️ Hapus
+                            🗑️ Delete
                           </button>
                         </td>
                       </tr>
@@ -533,7 +588,7 @@ const DepartmentsPage = () => {
             )}
           </div>
 
-          {/* Informasi Section */}
+          {/* Information Section */}
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mt-6">
             <div className="flex">
               <div className="flex-shrink-0">
@@ -542,15 +597,15 @@ const DepartmentsPage = () => {
                 </svg>
               </div>
               <div className="ml-3">
-                <h3 className="text-sm font-medium text-blue-800">Informasi Penting</h3>
+                <h3 className="text-sm font-medium text-blue-800">Important Information</h3>
                 <div className="mt-2 text-sm text-blue-700">
                   <ul className="list-disc list-inside space-y-1">
-                    <li>User dengan role atau jabatan yang mengandung manager dan general_manager dapat ditugaskan sebagai kepala departemen</li>
-                    <li>Filter sekarang mengabaikan status user - semua user dengan role manager akan ditampilkan</li>
-                    <li>Pastikan role atau jabatan user sudah sesuai di koleksi users</li>
-                    <li>Departemen tidak dapat dihapus jika masih memiliki karyawan aktif</li>
-                    <li>Penunjukkan manager departemen akan mempengaruhi alur approval form</li>
-                    <li>Field dept pada user bisa berisi ID department atau nama department</li>
+                    <li>Users with a role or position containing 'manager' and 'general_manager' can be assigned as department heads</li>
+                    <li>The filter now ignores user status - all users with a manager role will be displayed</li>
+                    <li>Ensure the user's role or position is correct in the users collection</li>
+                    <li>Departments cannot be deleted if they still have active employees</li>
+                    <li>Assigning a department manager will affect the form approval flow</li>
+                    <li>The 'dept' field for a user can contain either the department ID or the department name</li>
                   </ul>
                 </div>
               </div>

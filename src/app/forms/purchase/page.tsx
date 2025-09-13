@@ -38,6 +38,7 @@ const PurchaseRequestPage: React.FC = () => {
     const [deptName, setDeptName] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [purchaseItems, setPurchaseItems] = useState<PurchaseItem[]>([]);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false); // New state for sidebar
     
     const [formData, setFormData] = useState({
         tanggalRequest: new Date().toISOString().split('T')[0],
@@ -73,9 +74,9 @@ const PurchaseRequestPage: React.FC = () => {
                         await Swal.fire({
                             icon: 'error',
                             title: 'Oops...',
-                            text: 'Dokumen departemen tidak ditemukan!',
+                            text: 'Department document not found!',
                         });
-                        setDeptName("Tidak Ditemukan");
+                        setDeptName("Not Found");
                     }
 
                 } else {
@@ -83,7 +84,7 @@ const PurchaseRequestPage: React.FC = () => {
                     await Swal.fire({
                         icon: 'error',
                         title: 'Oops...',
-                        text: 'Data pengguna tidak ditemukan. Silakan hubungi dukungan.',
+                        text: 'User data not found. Please contact support.',
                     });
                     router.push("/");
                 }
@@ -108,8 +109,8 @@ const PurchaseRequestPage: React.FC = () => {
         if (!newItem.namaItem || newItem.qty === "" || !newItem.unit || !newItem.alasan) {
             Swal.fire({
                 icon: 'warning',
-                title: 'Perhatian!',
-                text: 'Nama item, kuantitas, unit, dan alasan harus diisi!',
+                title: 'Attention!',
+                text: 'Item name, quantity, unit, and reason must be filled!',
             });
             return;
         }
@@ -136,13 +137,13 @@ const PurchaseRequestPage: React.FC = () => {
 
     const handleRemoveItem = (itemId: string) => {
         Swal.fire({
-            title: 'Apakah Anda yakin?',
-            text: "Anda tidak akan bisa mengembalikan ini!",
+            title: 'Are you sure?',
+            text: "You won't be able to revert this!",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
             cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Ya, hapus!'
+            confirmButtonText: 'Yes, delete it!'
         }).then((result) => {
             if (result.isConfirmed) {
                 setPurchaseItems(prev => prev.filter(item => item.id !== itemId).map((item, index) => ({
@@ -150,8 +151,8 @@ const PurchaseRequestPage: React.FC = () => {
                     no: index + 1
                 })));
                 Swal.fire(
-                    'Dihapus!',
-                    'Item Anda telah dihapus.',
+                    'Deleted!',
+                    'Your item has been deleted.',
                     'success'
                 );
             }
@@ -165,19 +166,19 @@ const PurchaseRequestPage: React.FC = () => {
         if (purchaseItems.length === 0) {
             Swal.fire({
                 icon: 'warning',
-                title: 'Perhatian!',
-                text: 'Tambahkan minimal satu item pembelian!',
+                title: 'Attention!',
+                text: 'Please add at least one purchase item!',
             });
             return;
         }
         
         const confirmationResult = await Swal.fire({
-            title: 'Ajukan Permintaan Pembelian?',
-            text: "Anda akan mengirimkan formulir ini. Pastikan semua data sudah benar.",
+            title: 'Submit Purchase Request?',
+            text: "You are about to submit this form. Please ensure all data is correct.",
             icon: 'question',
             showCancelButton: true,
-            confirmButtonText: 'Ya, Ajukan!',
-            cancelButtonText: 'Batal',
+            confirmButtonText: 'Yes, Submit!',
+            cancelButtonText: 'Cancel',
             confirmButtonColor: '#4CAF50',
             cancelButtonColor: '#d33',
         });
@@ -199,7 +200,7 @@ const PurchaseRequestPage: React.FC = () => {
                 status: "pending",
                 requesterUid: userProfile.uid,
                 requesterName: userProfile.nama,
-                // PERBAIKAN: Mengirim deptId alih-alih dept
+                // CORRECTION: Sending deptId instead of dept
                 deptId: userProfile.dept, 
                 createdAt: serverTimestamp(),
                 updatedAt: serverTimestamp(),
@@ -220,8 +221,8 @@ const PurchaseRequestPage: React.FC = () => {
 
             await Swal.fire({
                 icon: 'success',
-                title: 'Berhasil!',
-                text: 'Formulir permintaan pembelian berhasil disimpan!',
+                title: 'Success!',
+                text: 'Purchase request form submitted successfully!',
                 timer: 2000,
                 showConfirmButton: false
             });
@@ -232,8 +233,8 @@ const PurchaseRequestPage: React.FC = () => {
             console.error("Error submitting form:", error);
             await Swal.fire({
                 icon: 'error',
-                title: 'Terjadi Kesalahan',
-                text: 'Terjadi kesalahan saat menyimpan formulir. Silakan coba lagi.',
+                title: 'An Error Occurred',
+                text: 'An error occurred while saving the form. Please try again.',
             });
         } finally {
             setIsSubmitting(false);
@@ -241,13 +242,13 @@ const PurchaseRequestPage: React.FC = () => {
     };
 
     if (!userProfile) {
-        return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">Memuat data pengguna...</div>;
+        return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">Loading user data...</div>;
     }
 
     return (
         <div className="min-h-screen flex bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
             {/* Sidebar */}
-            <div className="w-64 bg-white shadow-lg">
+            <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transition-transform duration-300 ease-in-out md:static md:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
                 <div className="p-4 border-b border-green-100">
                     <div className="flex items-center justify-center mb-4">
                         <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
@@ -259,21 +260,21 @@ const PurchaseRequestPage: React.FC = () => {
 
                 <nav className="p-4">
                     <div className="mb-2">
-                        <Link href="/forms" className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition mb-4">
+                        <Link href="/forms" className="flex items-center p-2 rounded-lg text-gray-700 hover:bg-green-50 hover:text-green-700 transition mb-4" onClick={() => setIsSidebarOpen(false)}>
                             <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                             </svg>
-                            Kembali ke Daftar Form
+                            Back to Forms List
                         </Link>
                     </div>
 
                     <div className="mb-6">
-                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Formulir Permintaan Pembelian</h2>
+                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Purchase Request Form</h2>
                         <ul className="space-y-1">
                             <li>
                                 <div className="flex items-center p-2 rounded-lg bg-green-50 text-green-700 font-medium">
                                     <span className="mr-3">📝</span>
-                                    Isi Formulir
+                                    Fill Form
                                 </div>
                             </li>
                             <li>
@@ -292,9 +293,20 @@ const PurchaseRequestPage: React.FC = () => {
                 {/* Header */}
                 <header className="bg-white shadow-sm border-b border-green-100">
                     <div className="flex items-center justify-between p-4">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Formulir Permintaan Pembelian</h1>
-                            <p className="text-sm text-gray-500">Ajukan permintaan pembelian barang/jasa</p>
+                        <div className="flex items-center">
+                            {/* Hamburger Menu for Mobile */}
+                            <button
+                                className="mr-4 text-gray-500 hover:text-gray-700 focus:outline-none md:hidden"
+                                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
+                                </svg>
+                            </button>
+                            <div>
+                                <h1 className="text-2xl font-bold text-gray-900">Purchase Request Form</h1>
+                                <p className="text-sm text-gray-500">Submit a request to purchase goods or services</p>
+                            </div>
                         </div>
                         <div className="flex space-x-2">
                             <button
@@ -302,7 +314,7 @@ const PurchaseRequestPage: React.FC = () => {
                                 disabled={isSubmitting}
                                 className="px-4 py-2 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] disabled:opacity-50 transition"
                             >
-                                {isSubmitting ? "Mengajukan..." : "Ajukan Sekarang"}
+                                {isSubmitting ? "Submitting..." : "Submit Now"}
                             </button>
                         </div>
                     </div>
@@ -314,10 +326,10 @@ const PurchaseRequestPage: React.FC = () => {
                         {/* General Info */}
                         <div className="bg-white rounded-xl shadow-md p-6 border border-green-100">
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Informasi Umum</h3>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4">General Information</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
-                                        <label htmlFor="requesterName" className="block text-sm font-medium text-gray-700 mb-1">Nama Pemohon</label>
+                                        <label htmlFor="requesterName" className="block text-sm font-medium text-gray-700 mb-1">Requester Name</label>
                                         <input
                                             type="text"
                                             id="requesterName"
@@ -327,7 +339,7 @@ const PurchaseRequestPage: React.FC = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label htmlFor="dept" className="block text-sm font-medium text-gray-700 mb-1">Departemen</label>
+                                        <label htmlFor="dept" className="block text-sm font-medium text-gray-700 mb-1">Department</label>
                                         <input
                                             type="text"
                                             id="dept"
@@ -337,7 +349,7 @@ const PurchaseRequestPage: React.FC = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label htmlFor="tanggalRequest" className="block text-sm font-medium text-gray-700 mb-1">Tanggal Permintaan</label>
+                                        <label htmlFor="tanggalRequest" className="block text-sm font-medium text-gray-700 mb-1">Request Date</label>
                                         <input
                                             type="date"
                                             name="tanggalRequest"
@@ -348,14 +360,14 @@ const PurchaseRequestPage: React.FC = () => {
                                         />
                                     </div>
                                     <div>
-                                        <label htmlFor="urgent" className="block text-sm font-medium text-gray-700 mb-1">Status Urgensi</label>
+                                        <label htmlFor="urgent" className="block text-sm font-medium text-gray-700 mb-1">Urgency Status</label>
                                         <select
                                             name="urgent"
                                             value={formData.urgent}
                                             onChange={handleChange}
                                             className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                         >
-                                            <option value="no">Tidak Urgent</option>
+                                            <option value="no">Not Urgent</option>
                                             <option value="yes">Urgent</option>
                                         </select>
                                     </div>
@@ -367,21 +379,21 @@ const PurchaseRequestPage: React.FC = () => {
                         {purchaseItems.length > 0 && (
                             <div className="bg-white rounded-xl shadow-md p-6 border border-green-100">
                                 <div className="flex justify-between items-center mb-4">
-                                    <h3 className="text-lg font-semibold text-gray-900">Daftar Item</h3>
+                                    <h3 className="text-lg font-semibold text-gray-900">Item List</h3>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full table-auto border-collapse">
                                         <thead className="bg-gray-50">
                                             <tr>
                                                 <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">No.</th>
-                                                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Kode Item</th>
-                                                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Nama Item</th>
-                                                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Spesifikasi</th>
+                                                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Item Code</th>
+                                                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Item Name</th>
+                                                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Specification</th>
                                                 <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Qty</th>
                                                 <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Unit</th>
-                                                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Alasan</th>
+                                                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Reason</th>
                                                 <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Remarks</th>
-                                                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Aksi</th>
+                                                <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Action</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-200">
@@ -401,7 +413,7 @@ const PurchaseRequestPage: React.FC = () => {
                                                             onClick={() => handleRemoveItem(item.id)}
                                                             className="text-red-600 hover:text-red-800"
                                                         >
-                                                            Hapus
+                                                            Remove
                                                         </button>
                                                     </td>
                                                 </tr>
@@ -417,36 +429,37 @@ const PurchaseRequestPage: React.FC = () => {
                             <Link
                                 href="/forms"
                                 className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
+                                onClick={() => setIsSidebarOpen(false)}
                             >
-                                Batal
+                                Cancel
                             </Link>
                             <button
                                 type="submit"
                                 disabled={isSubmitting || purchaseItems.length === 0}
                                 className="px-6 py-2.5 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] disabled:opacity-50 transition"
                             >
-                                {isSubmitting ? "Mengajukan..." : "Ajukan Permintaan"}
+                                {isSubmitting ? "Submitting..." : "Submit Request"}
                             </button>
                         </div>
                     </form>
 
                     {/* Input for new item - Pindahkan ke luar form */}
                     <div className="mt-6 bg-white rounded-xl shadow-md p-6 border border-green-100">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Tambah Item Baru</h3>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Item</h3>
                         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div>
-                                <label htmlFor="kodeItem" className="block text-sm font-medium text-gray-700 mb-1">Kode Item</label>
+                                <label htmlFor="kodeItem" className="block text-sm font-medium text-gray-700 mb-1">Item Code</label>
                                 <input
                                     type="text"
                                     name="kodeItem"
                                     value={newItem.kodeItem}
                                     onChange={handleNewItemChange}
-                                    placeholder="Opsional"
+                                    placeholder="Optional"
                                     className="w-full p-2.5 border border-gray-300 rounded-lg"
                                 />
                             </div>
                             <div className="col-span-1 md:col-span-2">
-                                <label htmlFor="namaItem" className="block text-sm font-medium text-gray-700 mb-1">Nama Item <span className="text-red-500">*</span></label>
+                                <label htmlFor="namaItem" className="block text-sm font-medium text-gray-700 mb-1">Item Name <span className="text-red-500">*</span></label>
                                 <input
                                     type="text"
                                     name="namaItem"
@@ -457,18 +470,18 @@ const PurchaseRequestPage: React.FC = () => {
                                 />
                             </div>
                             <div className="col-span-1 md:col-span-2 lg:col-span-1">
-                                <label htmlFor="spek" className="block text-sm font-medium text-gray-700 mb-1">Spesifikasi</label>
+                                <label htmlFor="spek" className="block text-sm font-medium text-gray-700 mb-1">Specification</label>
                                 <input
                                     type="text"
                                     name="spek"
                                     value={newItem.spek}
                                     onChange={handleNewItemChange}
-                                    placeholder="Opsional"
+                                    placeholder="Optional"
                                     className="w-full p-2.5 border border-gray-300 rounded-lg"
                                 />
                             </div>
                             <div>
-                                <label htmlFor="qty" className="block text-sm font-medium text-gray-700 mb-1">Kuantitas <span className="text-red-500">*</span></label>
+                                <label htmlFor="qty" className="block text-sm font-medium text-gray-700 mb-1">Quantity <span className="text-red-500">*</span></label>
                                 <input
                                     type="number"
                                     name="qty"
@@ -485,13 +498,13 @@ const PurchaseRequestPage: React.FC = () => {
                                     name="unit"
                                     value={newItem.unit}
                                     onChange={handleNewItemChange}
-                                    placeholder="Contoh: Pcs, Unit, Meter"
+                                    placeholder="Example: Pcs, Unit, Meter"
                                     className="w-full p-2.5 border border-gray-300 rounded-lg"
                                     required
                                 />
                             </div>
                             <div className="col-span-1 md:col-span-2">
-                                <label htmlFor="alasan" className="block text-sm font-medium text-gray-700 mb-1">Alasan Pembelian <span className="text-red-500">*</span></label>
+                                <label htmlFor="alasan" className="block text-sm font-medium text-gray-700 mb-1">Reason for Purchase <span className="text-red-500">*</span></label>
                                 <textarea
                                     name="alasan"
                                     value={newItem.alasan}
@@ -508,12 +521,12 @@ const PurchaseRequestPage: React.FC = () => {
                                     value={newItem.remarks}
                                     onChange={handleNewItemChange}
                                     rows={2}
-                                    placeholder="Opsional"
+                                    placeholder="Optional"
                                     className="w-full p-2.5 border border-gray-300 rounded-lg"
                                 />
                             </div>
                             <div className="col-span-1 md:col-span-2">
-                                <label htmlFor="photo" className="block text-sm font-medium text-gray-700 mb-1">Foto (Opsional)</label>
+                                <label htmlFor="photo" className="block text-sm font-medium text-gray-700 mb-1">Photo (Optional)</label>
                                 <input
                                     type="file"
                                     name="photo"
@@ -527,7 +540,7 @@ const PurchaseRequestPage: React.FC = () => {
                                     onClick={handleAddItem}
                                     className="px-6 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition"
                                 >
-                                    + Tambahkan Item
+                                    + Add Item
                                 </button>
                             </div>
                         </div>
@@ -543,12 +556,12 @@ const PurchaseRequestPage: React.FC = () => {
                                 </svg>
                             </div>
                             <div className="ml-3">
-                                <h3 className="text-sm font-medium text-yellow-800">Informasi Penting</h3>
+                                <h3 className="text-sm font-medium text-yellow-800">Important Information</h3>
                                 <div className="mt-2 text-sm text-yellow-700">
                                     <ul className="list-disc list-inside space-y-1">
-                                        <li>Pastikan mengisi semua informasi yang diperlukan untuk setiap item.</li>
-                                        <li>Unggah foto jika diperlukan sebagai lampiran tambahan.</li>
-                                        <li>Permintaan ini akan diteruskan ke atasan Anda untuk disetujui.</li>
+                                        <li>Ensure you fill out all necessary information for each item.</li>
+                                        <li>Upload a photo if needed as an additional attachment.</li>
+                                        <li>This request will be forwarded to your superior for approval.</li>
                                     </ul>
                                 </div>
                             </div>

@@ -44,6 +44,7 @@ const MissedPunchRequestPage: React.FC = () => {
     const [missedPunchEntries, setMissedPunchEntries] = useState<MissedPunchEntry[]>([]);
     const [selectedEmployees, setSelectedEmployees] = useState<string[]>([]);
     const [editingEntry, setEditingEntry] = useState<MissedPunchEntry | null>(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     const [formData, setFormData] = useState({
         jenisPengajuan: "diri-sendiri",
@@ -74,8 +75,8 @@ const MissedPunchRequestPage: React.FC = () => {
                     console.error("User document not found!");
                     Swal.fire({
                         icon: 'error',
-                        title: 'Data Pengguna Tidak Ditemukan',
-                        text: 'Silakan hubungi dukungan teknis.'
+                        title: 'User Data Not Found',
+                        text: 'Please contact technical support.'
                     }).then(() => router.push("/"));
                 }
             } else {
@@ -105,8 +106,8 @@ const MissedPunchRequestPage: React.FC = () => {
                 console.error("Error fetching employees:", error);
                 Swal.fire({
                     icon: 'error',
-                    title: 'Gagal Memuat Data',
-                    text: 'Terjadi kesalahan saat mengambil data karyawan.'
+                    title: 'Failed to Load Data',
+                    text: 'An error occurred while fetching employee data.'
                 });
             }
         };
@@ -148,8 +149,8 @@ const MissedPunchRequestPage: React.FC = () => {
         if (selectedEmployees.length === 0) {
             await Swal.fire({
                 icon: 'warning',
-                title: 'Peringatan',
-                text: 'Pilih minimal satu karyawan terlebih dahulu!'
+                title: 'Warning',
+                text: 'Select at least one employee first!'
             });
             return;
         }
@@ -170,8 +171,8 @@ const MissedPunchRequestPage: React.FC = () => {
         if (newEntries.length === 0) {
             await Swal.fire({
                 icon: 'info',
-                title: 'Informasi',
-                text: 'Semua karyawan yang dipilih sudah ada di daftar.'
+                title: 'Information',
+                text: 'All selected employees are already in the list.'
             });
             return;
         }
@@ -182,20 +183,20 @@ const MissedPunchRequestPage: React.FC = () => {
 
     const removeMissedPunchEntry = async (entryId: string) => {
         const result = await Swal.fire({
-            title: 'Hapus data ini?',
-            text: "Anda tidak bisa mengembalikan ini!",
+            title: 'Delete this data?',
+            text: "You can't revert this!",
             icon: 'warning',
             showCancelButton: true,
             confirmButtonColor: '#d33',
             cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Ya, hapus!'
+            confirmButtonText: 'Yes, delete it!'
         });
         
         if (result.isConfirmed) {
             setMissedPunchEntries(prev => prev.filter(entry => entry.id !== entryId));
             Swal.fire(
-                'Terhapus!',
-                'Data missed punch telah dihapus.',
+                'Deleted!',
+                'The missed punch data has been deleted.',
                 'success'
             );
         }
@@ -208,19 +209,19 @@ const MissedPunchRequestPage: React.FC = () => {
         if (formData.jenisPengajuan === "untuk-anggota" && missedPunchEntries.length === 0) {
             await Swal.fire({
                 icon: 'warning',
-                title: 'Peringatan',
-                text: 'Tambahkan minimal satu karyawan untuk diajukan missed punch!'
+                title: 'Warning',
+                text: 'Add at least one employee for the missed punch request!'
             });
             return;
         }
 
         const confirmationResult = await Swal.fire({
-            title: 'Apakah Anda yakin?',
-            text: 'Anda akan mengajukan formulir missed punch ini. Pastikan semua data sudah benar.',
+            title: 'Are you sure?',
+            text: 'You are about to submit this missed punch form. Ensure all data is correct.',
             icon: 'question',
             showCancelButton: true,
-            confirmButtonText: 'Ya, Ajukan!',
-            cancelButtonText: 'Batal',
+            confirmButtonText: 'Yes, Submit!',
+            cancelButtonText: 'Cancel',
             confirmButtonColor: '#4CAF50',
             cancelButtonColor: '#d33',
         });
@@ -277,8 +278,8 @@ const MissedPunchRequestPage: React.FC = () => {
 
                 Swal.fire({
                     icon: 'success',
-                    title: 'Berhasil!',
-                    text: 'Form missed punch berhasil diajukan.',
+                    title: 'Success!',
+                    text: 'Missed punch form submitted successfully.',
                     timer: 2000,
                     showConfirmButton: false
                 }).then(() => {
@@ -289,8 +290,8 @@ const MissedPunchRequestPage: React.FC = () => {
                 console.error("Error submitting form:", error);
                 Swal.fire({
                     icon: 'error',
-                    title: 'Terjadi Kesalahan',
-                    text: 'Terjadi kesalahan saat menyimpan form. Silakan coba lagi.'
+                    title: 'An Error Occurred',
+                    text: 'An error occurred while saving the form. Please try again.'
                 });
             } finally {
                 setIsSubmitting(false);
@@ -303,9 +304,9 @@ const MissedPunchRequestPage: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen flex bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
+        <div className="min-h-screen flex flex-col lg:flex-row bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
             {/* Sidebar */}
-            <div className="w-64 bg-white shadow-lg">
+            <div className={`fixed inset-y-0 left-0 w-64 bg-white shadow-lg z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 transition-transform duration-300 ease-in-out`}>
                 <div className="p-4 border-b border-green-100">
                     <div className="flex items-center justify-center mb-4">
                         <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
@@ -321,17 +322,17 @@ const MissedPunchRequestPage: React.FC = () => {
                             <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                             </svg>
-                            Kembali ke Daftar Form
+                            Back to Forms List
                         </Link>
                     </div>
 
                     <div className="mb-6">
-                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Form Missed Punch</h2>
+                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Missed Punch Form</h2>
                         <ul className="space-y-1">
                             <li>
                                 <div className="flex items-center p-2 rounded-lg bg-green-50 text-green-700 font-medium">
                                     <span className="mr-3">📝</span>
-                                    Isi Form
+                                    Fill Form
                                 </div>
                             </li>
                         </ul>
@@ -342,34 +343,44 @@ const MissedPunchRequestPage: React.FC = () => {
             {/* Main Content */}
             <div className="flex-1 overflow-auto">
                 {/* Header */}
-                <header className="bg-white shadow-sm border-b border-green-100">
-                    <div className="flex items-center justify-between p-4">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Form Missed Punch Request</h1>
-                            <p className="text-sm text-gray-500">Ajukan perbaikan jam masuk/keluar untuk diri sendiri atau anggota tim</p>
+                <header className="bg-white shadow-sm border-b border-green-100 p-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                            <button
+                                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                                className="lg:hidden p-2 mr-2 rounded-md text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-green-500"
+                            >
+                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
+                                </svg>
+                            </button>
+                            <div>
+                                <h1 className="text-xl md:text-2xl font-bold text-gray-900">Missed Punch Request Form</h1>
+                                <p className="text-xs md:text-sm text-gray-500">Request a fix for missed check-in/out times for yourself or a team member</p>
+                            </div>
                         </div>
                         <div className="flex space-x-2">
-                            <button className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">
-                                Simpan Draft
+                            <button className="hidden sm:block px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition">
+                                Save Draft
                             </button>
                             <button
                                 onClick={handleSubmit}
                                 disabled={isSubmitting}
                                 className="px-4 py-2 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] disabled:opacity-50 transition"
                             >
-                                {isSubmitting ? "Mengajukan..." : "Ajukan Sekarang"}
+                                {isSubmitting ? "Submitting..." : "Submit Now"}
                             </button>
                         </div>
                     </div>
                 </header>
 
                 {/* Main Content */}
-                <main className="p-6">
-                    <div className="bg-white rounded-xl shadow-md p-6 border border-green-100">
+                <main className="p-4 md:p-6">
+                    <div className="bg-white rounded-xl shadow-md p-4 md:p-6 border border-green-100">
                         <form onSubmit={handleSubmit} className="space-y-6">
-                            {/* Jenis Pengajuan */}
+                            {/* Submission Type */}
                             <div>
-                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Jenis Pengajuan</h3>
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4">Submission Type</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <label className="flex items-center p-4 border border-gray-300 rounded-lg cursor-pointer hover:bg-green-50 transition">
                                         <input
@@ -381,8 +392,8 @@ const MissedPunchRequestPage: React.FC = () => {
                                             className="text-green-600 focus:ring-green-500"
                                         />
                                         <div className="ml-3">
-                                            <span className="block text-sm font-medium text-gray-900">Untuk Diri Sendiri</span>
-                                            <span className="block text-sm text-gray-500">Ajukan perbaikan jam masuk/keluar untuk diri sendiri</span>
+                                            <span className="block text-sm font-medium text-gray-900">For Myself</span>
+                                            <span className="block text-sm text-gray-500">Request a time correction for myself</span>
                                         </div>
                                     </label>
 
@@ -396,20 +407,20 @@ const MissedPunchRequestPage: React.FC = () => {
                                             className="text-green-600 focus:ring-green-500"
                                         />
                                         <div className="ml-3">
-                                            <span className="block text-sm font-medium text-gray-900">Untuk Anggota Tim</span>
-                                            <span className="block text-sm text-gray-500">Ajukan perbaikan jam masuk/keluar untuk anggota tim/department</span>
+                                            <span className="block text-sm font-medium text-gray-900">For Team Members</span>
+                                            <span className="block text-sm text-gray-500">Request a time correction for team/department members</span>
                                         </div>
                                     </label>
                                 </div>
                             </div>
 
-                            {/* Form untuk Diri Sendiri */}
+                            {/* Form for Self */}
                             {formData.jenisPengajuan === "diri-sendiri" && (
                                 <div>
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Detail Missed Punch</h3>
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Missed Punch Details</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Miss</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Missed Date</label>
                                             <input
                                                 type="date"
                                                 name="tanggal"
@@ -420,7 +431,7 @@ const MissedPunchRequestPage: React.FC = () => {
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Jenis Miss</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Missed Type</label>
                                             <select
                                                 name="jenisMiss"
                                                 value={defaultEntry.jenisMiss}
@@ -428,12 +439,12 @@ const MissedPunchRequestPage: React.FC = () => {
                                                 className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                 required
                                             >
-                                                <option value="checkIn">Jam Masuk (Check-in)</option>
-                                                <option value="checkOut">Jam Keluar (Check-out)</option>
+                                                <option value="checkIn">Check-in</option>
+                                                <option value="checkOut">Check-out</option>
                                             </select>
                                         </div>
                                         <div>
-                                            <label className="block text-sm font-medium text-gray-700 mb-1">Jam yang Benar</label>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Correct Time</label>
                                             <input
                                                 type="time"
                                                 name="jam"
@@ -447,10 +458,10 @@ const MissedPunchRequestPage: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Form untuk Anggota Tim */}
+                            {/* Form for Team Members */}
                             {formData.jenisPengajuan === "untuk-anggota" && (
                                 <div>
-                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Tambah Anggota Tim</h3>
+                                    <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Team Members</h3>
                                     <div className="bg-gray-50 p-4 rounded-lg mb-6">
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                                             <div>
@@ -461,7 +472,7 @@ const MissedPunchRequestPage: React.FC = () => {
                                                     onChange={handleChange}
                                                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                 >
-                                                    <option value="">Pilih Department</option>
+                                                    <option value="">Select Department</option>
                                                     {departments.map(dept => (
                                                         <option key={dept} value={dept}>{dept}</option>
                                                     ))}
@@ -470,7 +481,7 @@ const MissedPunchRequestPage: React.FC = () => {
 
                                             <div>
                                                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                                                    Pilih Karyawan
+                                                    Select Employee
                                                 </label>
 
                                                 {/* Select All */}
@@ -489,7 +500,7 @@ const MissedPunchRequestPage: React.FC = () => {
                                                         className="mr-2"
                                                     />
                                                     <label htmlFor="selectAll" className="text-sm font-medium text-gray-700">
-                                                        Pilih Semua
+                                                        Select All
                                                     </label>
                                                 </div>
 
@@ -522,7 +533,7 @@ const MissedPunchRequestPage: React.FC = () => {
 
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Tanggal Default</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Default Date</label>
                                                 <input
                                                     type="date"
                                                     name="tanggal"
@@ -532,19 +543,19 @@ const MissedPunchRequestPage: React.FC = () => {
                                                 />
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Jenis Miss Default</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Default Miss Type</label>
                                                 <select
                                                     name="jenisMiss"
                                                     value={defaultEntry.jenisMiss}
                                                     onChange={handleDefaultEntryChange}
                                                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                 >
-                                                    <option value="checkIn">Jam Masuk</option>
-                                                    <option value="checkOut">Jam Keluar</option>
+                                                    <option value="checkIn">Check-in</option>
+                                                    <option value="checkOut">Check-out</option>
                                                 </select>
                                             </div>
                                             <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Jam Default</label>
+                                                <label className="block text-sm font-medium text-gray-700 mb-1">Default Time</label>
                                                 <input
                                                     type="time"
                                                     name="jam"
@@ -561,28 +572,28 @@ const MissedPunchRequestPage: React.FC = () => {
                                             disabled={selectedEmployees.length === 0}
                                             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
                                         >
-                                            + Tambahkan {selectedEmployees.length > 0 ? `(${selectedEmployees.length} karyawan)` : ""}
+                                            + Add {selectedEmployees.length > 0 ? `(${selectedEmployees.length} employees)` : ""}
                                         </button>
                                     </div>
 
-                                    {/* Daftar Karyawan yang Sudah Ditambahkan */}
+                                    {/* List of Added Employees */}
                                     {missedPunchEntries.length > 0 && (
                                         <div>
                                             <div className="flex justify-between items-center mb-4">
-                                                <h3 className="text-lg font-semibold text-gray-900">Daftar Missed Punch Anggota Tim</h3>
+                                                <h3 className="text-lg font-semibold text-gray-900">Team Member Missed Punch List</h3>
                                             </div>
 
                                             <div className="overflow-x-auto">
                                                 <table className="w-full table-auto">
                                                     <thead className="bg-gray-50">
                                                         <tr>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Nama</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Name</th>
                                                             <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">NIK</th>
                                                             <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Dept</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Tanggal</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Jenis Miss</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Jam</th>
-                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Aksi</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Date</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Missed Type</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Time</th>
+                                                            <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">Action</th>
                                                         </tr>
                                                     </thead>
                                                     <tbody className="divide-y divide-gray-200">
@@ -607,8 +618,8 @@ const MissedPunchRequestPage: React.FC = () => {
                                                                         onChange={(e) => handleEntryChange(e, entry.id)}
                                                                         className="w-full p-1 border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
                                                                     >
-                                                                        <option value="checkIn">Jam Masuk</option>
-                                                                        <option value="checkOut">Jam Keluar</option>
+                                                                        <option value="checkIn">Check-in</option>
+                                                                        <option value="checkOut">Check-out</option>
                                                                     </select>
                                                                 </td>
                                                                 <td className="px-4 py-2 text-sm">
@@ -626,7 +637,7 @@ const MissedPunchRequestPage: React.FC = () => {
                                                                         onClick={() => removeMissedPunchEntry(entry.id)}
                                                                         className="text-red-600 hover:text-red-800"
                                                                     >
-                                                                        Hapus
+                                                                        Delete
                                                                     </button>
                                                                 </td>
                                                             </tr>
@@ -639,15 +650,15 @@ const MissedPunchRequestPage: React.FC = () => {
                                 </div>
                             )}
 
-                            {/* Alasan Missed Punch */}
+                            {/* Missed Punch Reason */}
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Alasan Missed Punch</label>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Missed Punch Reason</label>
                                 <textarea
                                     name="alasan"
                                     value={formData.alasan}
                                     onChange={handleChange}
                                     rows={3}
-                                    placeholder="Jelaskan alasan mengapa perlu melakukan perbaikan jam"
+                                    placeholder="Explain the reason for the time correction"
                                     className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                     required
                                 />
@@ -659,20 +670,20 @@ const MissedPunchRequestPage: React.FC = () => {
                                     href="/forms"
                                     className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
                                 >
-                                    Batal
+                                    Cancel
                                 </Link>
                                 <button
                                     type="submit"
                                     disabled={isSubmitting}
                                     className="px-6 py-2.5 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] disabled:opacity-50 transition"
                                 >
-                                    {isSubmitting ? "Mengajukan..." : "Ajukan Missed Punch"}
+                                    {isSubmitting ? "Submitting..." : "Submit Missed Punch"}
                                 </button>
                             </div>
                         </form>
                     </div>
 
-                    {/* Informasi Section */}
+                    {/* Information Section */}
                     <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mt-6">
                         <div className="flex">
                             <div className="flex-shrink-0">
@@ -681,13 +692,13 @@ const MissedPunchRequestPage: React.FC = () => {
                                 </svg>
                             </div>
                             <div className="ml-3">
-                                <h3 className="text-sm font-medium text-yellow-800">Informasi Penting</h3>
+                                <h3 className="text-sm font-medium text-yellow-800">Important Information</h3>
                                 <div className="mt-2 text-sm text-yellow-700">
                                     <ul className="list-disc list-inside space-y-1">
-                                        <li>Form ini digunakan untuk memperbaiki jam masuk atau jam keluar yang terlewat.</li>
-                                        <li>Pastikan jam yang Anda masukkan benar dan sesuai dengan jadwal kerja.</li>
-                                        <li>Anda dapat mengedit jam dan jenis miss per individu setelah menambahkan karyawan.</li>
-                                        <li>Form harus diajukan maksimal H+1 dari tanggal missed punch.</li>
+                                        <li>This form is used to correct missed check-in or check-out times.</li>
+                                        <li>Ensure the time you enter is correct and matches your work schedule.</li>
+                                        <li>You can edit the time and missed type per individual after adding employees.</li>
+                                        <li>The form must be submitted no later than D+1 from the missed punch date.</li>
                                     </ul>
                                 </div>
                             </div>

@@ -49,6 +49,8 @@ interface GroupedMissedPunch {
     dateSubmitted: string;
     department: string;
     employeeName: string;
+    employeeNik: string;
+    employeeDept: string;
     missedDate: string;
     checkInTime: string | null;
     checkOutTime: string | null;
@@ -66,6 +68,7 @@ const MissedPunchRecapitulationPage: React.FC = () => {
     const [departments, setDepartments] = useState<string[]>([]);
     const [deptIdToName, setDeptIdToName] = useState<Map<string, string>>(new Map());
     const [selectedDept, setSelectedDept] = useState<string>("");
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const router = useRouter();
 
     const safeToDate = (value: Timestamp | string): Date | null => {
@@ -191,9 +194,11 @@ const MissedPunchRecapitulationPage: React.FC = () => {
                         groupedDataMap.set(key, {
                             id: form.id,
                             requesterName: form.requesterName,
-                            dateSubmitted: safeToDate(form.createdAt)?.toLocaleDateString('id-ID') || '',
+                            dateSubmitted: safeToDate(form.createdAt)?.toLocaleDateString('en-US') || '',
                             department: deptIdToName.get(form.deptId as string) || '',
                             employeeName: entry.employee.nama,
+                            employeeNik: entry.employee.nik,
+                            employeeDept: entry.employee.dept,
                             missedDate: entry.tanggal,
                             checkInTime: entry.jenisMiss === "checkIn" ? entry.jam : null,
                             checkOutTime: entry.jenisMiss === "checkOut" ? entry.jam : null,
@@ -232,8 +237,10 @@ const MissedPunchRecapitulationPage: React.FC = () => {
                 "Form ID": item.id,
                 "Requester Name": item.requesterName,
                 "Date Submitted": item.dateSubmitted,
-                "Department": item.department,
+                "Form Department": item.department, // Changed header for clarity
                 "Employee Name": item.employeeName,
+                "Employee NIK": item.employeeNik,
+                "Employee Dept": item.employeeDept, // New column
                 "Missed Date": item.missedDate,
                 "Check-In Time": item.checkInTime || "-",
                 "Check-Out Time": item.checkOutTime || "-",
@@ -276,9 +283,9 @@ const MissedPunchRecapitulationPage: React.FC = () => {
     }
 
     return (
-        <div className="min-h-screen flex bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
+        <div className="min-h-screen flex flex-col lg:flex-row bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
             {/* Sidebar */}
-            <div className="w-64 bg-white shadow-lg">
+            <div className={`fixed inset-y-0 left-0 w-64 bg-white shadow-lg z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 transition-transform duration-300 ease-in-out`}>
                 <div className="p-4 border-b border-green-100">
                     <div className="flex items-center justify-center mb-4">
                         <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
@@ -319,7 +326,20 @@ const MissedPunchRecapitulationPage: React.FC = () => {
                 {/* Header */}
                 <header className="bg-white shadow-sm border-b border-green-100">
                     <div className="flex items-center justify-between p-4">
-                        <h1 className="text-2xl font-bold text-gray-900">Missed Punch Recapitulation</h1>
+                        <div className="flex items-center">
+                            <button
+                                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                                className="lg:hidden p-2 mr-2 rounded-md text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-green-500"
+                            >
+                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
+                                </svg>
+                            </button>
+                            <div>
+                                <h1 className="text-xl md:text-2xl font-bold text-gray-900">Missed Punch Recapitulation</h1>
+                                <p className="text-xs md:text-sm text-gray-500">View and export all missed punch data</p>
+                            </div>
+                        </div>
                         <div className="flex items-center space-x-4">
                             <div className="text-right">
                                 <p className="font-medium text-gray-900">Hello, {user?.nama}</p>
@@ -358,9 +378,10 @@ const MissedPunchRecapitulationPage: React.FC = () => {
                                             <th className="py-3 px-4 text-sm font-semibold text-gray-600">No.</th>
                                             <th className="py-3 px-4 text-sm font-semibold text-gray-600">Form ID</th>
                                             <th className="py-3 px-4 text-sm font-semibold text-gray-600">Requester</th>
-                                            <th className="py-3 px-4 text-sm font-semibold text-gray-600">Date Submitted</th>
-                                            <th className="py-3 px-4 text-sm font-semibold text-gray-600">Department</th>
+                                            <th className="py-3 px-4 text-sm font-semibold text-gray-600">Date Submitted</th>   
                                             <th className="py-3 px-4 text-sm font-semibold text-gray-600">Employee Name</th>
+                                            <th className="py-3 px-4 text-sm font-semibold text-gray-600">Employee NIK</th>
+                                            <th className="py-3 px-4 text-sm font-semibold text-gray-600">Employee Dept</th>
                                             <th className="py-3 px-4 text-sm font-semibold text-gray-600">Missed Date</th>
                                             <th className="py-3 px-4 text-sm font-semibold text-gray-600">Check-In</th>
                                             <th className="py-3 px-4 text-sm font-semibold text-gray-600">Check-Out</th>
@@ -375,8 +396,9 @@ const MissedPunchRecapitulationPage: React.FC = () => {
                                                 <td className="py-3 px-4 text-sm font-medium text-gray-900">{item.id}</td>
                                                 <td className="py-3 px-4 text-sm text-gray-600">{item.requesterName}</td>
                                                 <td className="py-3 px-4 text-sm text-gray-600">{item.dateSubmitted}</td>
-                                                <td className="py-3 px-4 text-sm text-gray-600">{item.department}</td>
                                                 <td className="py-3 px-4 text-sm text-gray-600">{item.employeeName}</td>
+                                                <td className="py-3 px-4 text-sm text-gray-600">{item.employeeNik}</td>
+                                                <td className="py-3 px-4 text-sm text-gray-600">{item.employeeDept}</td>
                                                 <td className="py-3 px-4 text-sm text-gray-600">{item.missedDate}</td>
                                                 <td className="py-3 px-4 text-sm text-gray-600">{item.checkInTime || "-"}</td>
                                                 <td className="py-3 px-4 text-sm text-gray-600">{item.checkOutTime || "-"}</td>

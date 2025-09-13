@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import { doc, setDoc, serverTimestamp, collection, getDocs, query, where, getDoc } from "firebase/firestore";
 import { useAuthState } from "react-firebase-hooks/auth";
-import Swal from 'sweetalert2'; // Tambahkan import SweetAlert2
+import Swal from 'sweetalert2';
 
 // --- Interfaces ---
 interface UserData {
@@ -26,7 +26,7 @@ interface Employee {
     nama: string;
     dept?: string;
     jabatan: string;
-    uid?: string; // Tambahkan uid untuk kompatibilitas
+    uid?: string;
 }
 
 interface Department {
@@ -34,7 +34,12 @@ interface Department {
     name: string;
 }
 
-// --- Komponen Halaman ---
+// --- Page Component ---
+// Type guard to check if object is Employee
+function isEmployee(obj: UserData | Employee): obj is Employee {
+    return (obj as Employee).id !== undefined;
+}
+
 const ResignRequestPage: React.FC = () => {
     const router = useRouter();
     const [authUser] = useAuthState(auth);
@@ -44,8 +49,9 @@ const ResignRequestPage: React.FC = () => {
     const [departments, setDepartments] = useState<Department[]>([]);
     const [selectedDeptId, setSelectedDeptId] = useState<string>("");
     const [employees, setEmployees] = useState<Employee[]>([]);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-    // State untuk data form
+    // Form data state
     const [formData, setFormData] = useState({
         resignationDate: "",
         reason: "",
@@ -54,7 +60,7 @@ const ResignRequestPage: React.FC = () => {
 
     const [userDeptName, setUserDeptName] = useState<string>("");
 
-    // --- Efek samping untuk mengambil data pengguna & departemen ---
+    // --- Side effect to fetch user & department data ---
     useEffect(() => {
         const fetchInitialData = async () => {
             if (!authUser) {
@@ -62,14 +68,14 @@ const ResignRequestPage: React.FC = () => {
                 return;
             }
             try {
-                // Fetch user profile dari users
+                // Fetch user profile from users
                 const userDocRef = doc(db, "users", authUser.uid);
                 const userDocSnap = await getDoc(userDocRef);
                 if (userDocSnap.exists()) {
                     const userData = userDocSnap.data() as UserData;
                     setUserProfile(userData);
 
-                    // Dapatkan department ID - coba dari 'dept' terlebih dahulu, lalu 'deptId'
+                    // Get department ID - try 'dept' first, then 'deptId'
                     const userDeptId = userData.dept || userData.deptId;
 
                     // Fetch user's department name
@@ -97,7 +103,7 @@ const ResignRequestPage: React.FC = () => {
                 await Swal.fire({
                     icon: 'error',
                     title: 'Error',
-                    text: 'Gagal memuat data. Silakan coba lagi.'
+                    text: 'Failed to load data. Please try again.'
                 });
             }
         };
@@ -105,12 +111,12 @@ const ResignRequestPage: React.FC = () => {
         fetchInitialData();
     }, [authUser, router]);
 
-    // --- Efek samping untuk mengambil data karyawan dari employees saat departemen dipilih ---
+    // --- Side effect to fetch employees from employees collection when a department is selected ---
     useEffect(() => {
         const fetchEmployees = async () => {
             if (selectedDeptId) {
                 try {
-                    // Dapatkan nama departemen berdasarkan ID yang dipilih
+                    // Get the department name based on the selected ID
                     const selectedDept = departments.find(dept => dept.id === selectedDeptId);
                     if (!selectedDept) {
                         setEmployees([]);
@@ -119,7 +125,7 @@ const ResignRequestPage: React.FC = () => {
 
                     console.log("Fetching employees for department:", selectedDept.name);
 
-                    // Query dengan field 'dept' di collection employees (bukan deptId)
+                    // Query using the 'dept' field in the employees collection
                     const employeesQuery = query(
                         collection(db, "employees"),
                         where("dept", "==", selectedDept.name)
@@ -130,9 +136,10 @@ const ResignRequestPage: React.FC = () => {
 
                     employeesSnapshot.forEach(docSnap => {
                         const employeeData = docSnap.data() as Employee;
+                        const { id, ...restEmployeeData } = employeeData;
                         employeeList.push({
                             id: docSnap.id,
-                            ...employeeData
+                            ...restEmployeeData
                         });
                     });
 
@@ -151,7 +158,7 @@ const ResignRequestPage: React.FC = () => {
         fetchEmployees();
     }, [selectedDeptId, departments]);
 
-    // --- Logika Form ---
+    // --- Form Logic ---
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
@@ -169,14 +176,14 @@ const ResignRequestPage: React.FC = () => {
         setFormData(prev => ({ ...prev, employeeId: "" }));
     };
 
-    // --- Fungsi Utama untuk Submit ---
+    // --- Main Submit Function ---
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!userProfile) {
             await Swal.fire({
                 icon: 'error',
                 title: 'Error',
-                text: 'Profil pengguna belum dimuat. Silakan coba lagi.'
+                text: 'User profile not loaded. Please try again.'
             });
             return;
         }
@@ -184,8 +191,8 @@ const ResignRequestPage: React.FC = () => {
         if (!formData.resignationDate || !formData.reason) {
             await Swal.fire({
                 icon: 'warning',
-                title: 'Peringatan',
-                text: 'Harap lengkapi semua field yang wajib diisi.'
+                title: 'Warning',
+                text: 'Please complete all required fields.'
             });
             return;
         }
@@ -193,19 +200,19 @@ const ResignRequestPage: React.FC = () => {
         if (requestType === "team" && (!selectedDeptId || !formData.employeeId)) {
             await Swal.fire({
                 icon: 'warning',
-                title: 'Peringatan',
-                text: 'Harap pilih departemen dan anggota tim yang akan mengajukan pengunduran diri.'
+                title: 'Warning',
+                text: 'Please select a department and a team member for the resignation request.'
             });
             return;
         }
-        
+
         const confirmationResult = await Swal.fire({
-            title: 'Ajukan Pengunduran Diri?',
-            text: 'Anda akan mengirimkan formulir ini. Pastikan semua data sudah benar.',
+            title: 'Submit Resignation?',
+            text: 'You are about to submit this form. Make sure all data is correct.',
             icon: 'question',
             showCancelButton: true,
-            confirmButtonText: 'Ya, Ajukan!',
-            cancelButtonText: 'Batal',
+            confirmButtonText: 'Yes, Submit!',
+            cancelButtonText: 'Cancel',
             confirmButtonColor: '#4CAF50',
             cancelButtonColor: '#d33',
         });
@@ -221,13 +228,13 @@ const ResignRequestPage: React.FC = () => {
 
             let employeeToResign: Employee | UserData = userProfile;
 
-            // Dapatkan deptId dari userProfile - coba dari berbagai field yang mungkin
+            // Get the deptId from userProfile - try from possible fields
             const userDeptId = userProfile.deptId || userProfile.dept || "";
 
-            // Dapatkan nama departemen
+            // Get the department name
             let finalDeptName = userDeptName;
             if (!finalDeptName && userDeptId) {
-                // Jika userDeptName belum ada, cari dari departments array
+                // If userDeptName is not set, find it from the departments array
                 const userDepartment = departments.find(dept => dept.id === userDeptId);
                 if (userDepartment) {
                     finalDeptName = userDepartment.name;
@@ -240,7 +247,7 @@ const ResignRequestPage: React.FC = () => {
                     await Swal.fire({
                         icon: 'error',
                         title: 'Error',
-                        text: 'Karyawan tidak ditemukan.'
+                        text: 'Employee not found.'
                     });
                     setIsSubmitting(false);
                     return;
@@ -248,18 +255,17 @@ const ResignRequestPage: React.FC = () => {
                 employeeToResign = selectedEmployee;
             }
 
-            // Pastikan semua field memiliki nilai, jika undefined gunakan string kosong
+            // Ensure all fields have values, if undefined use an empty string
             const resignData = {
-                id: formId,
+                employeeUid: employeeToResign.uid || (isEmployee(employeeToResign) ? employeeToResign.id : "") || "",
                 type: "resign",
                 jenisPengajuan: "Resign",
                 requesterUid: userProfile.uid || "",
                 requesterName: userProfile.nama || "",
-                employeeUid: employeeToResign.uid || employeeToResign.id || "",
                 employeeName: employeeToResign.nama || "",
                 employeeNik: employeeToResign.nik || "",
-                deptId: userDeptId, // Gunakan userDeptId yang sudah di-handle
-                dept: finalDeptName || "", // Gunakan finalDeptName, fallback ke string kosong
+                deptId: userDeptId,
+                dept: finalDeptName || "",
                 resignationDate: formData.resignationDate,
                 reason: formData.reason,
                 status: "pending",
@@ -267,15 +273,15 @@ const ResignRequestPage: React.FC = () => {
                 updatedAt: serverTimestamp(),
             };
 
-            // Log data untuk debugging
+            // Log data for debugging
             console.log("Submitting resign data:", resignData);
 
             await setDoc(doc(db, "forms", formId), resignData);
 
             await Swal.fire({
                 icon: 'success',
-                title: 'Berhasil!',
-                text: 'Form pengunduran diri berhasil diajukan!',
+                title: 'Success!',
+                text: 'Resignation form submitted successfully!',
                 timer: 2000,
                 showConfirmButton: false
             });
@@ -285,8 +291,8 @@ const ResignRequestPage: React.FC = () => {
             console.error("Error submitting form:", error);
             await Swal.fire({
                 icon: 'error',
-                title: 'Terjadi Kesalahan',
-                text: 'Terjadi kesalahan saat menyimpan form. Silakan coba lagi.'
+                title: 'An Error Occurred',
+                text: 'An error occurred while saving the form. Please try again.'
             });
         } finally {
             setIsSubmitting(false);
@@ -294,16 +300,16 @@ const ResignRequestPage: React.FC = () => {
     };
 
     if (!userProfile) {
-        return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">Memuat data pengguna...</div>;
+        return <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">Loading user data...</div>;
     }
 
     const isManager = userProfile.role === "manager";
 
-    // --- Struktur JSX (Halaman Form) ---
+    // --- JSX Structure (Form Page) ---
     return (
-        <div className="min-h-screen flex bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
+        <div className="min-h-screen flex flex-col lg:flex-row bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
             {/* Sidebar */}
-            <div className="w-64 bg-white shadow-lg">
+            <div className={`fixed inset-y-0 left-0 w-64 bg-white shadow-lg z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 transition-transform duration-300 ease-in-out`}>
                 <div className="p-4 border-b border-green-100">
                     <div className="flex items-center justify-center mb-4">
                         <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
@@ -319,16 +325,16 @@ const ResignRequestPage: React.FC = () => {
                             <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                             </svg>
-                            Kembali ke Daftar Form
+                            Back to Forms List
                         </Link>
                     </div>
                     <div className="mb-6">
-                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Form Resign</h2>
+                        <h2 className="text-xs uppercase tracking-wider text-gray-500 font-semibold mb-3">Resignation Form</h2>
                         <ul className="space-y-1">
                             <li>
                                 <div className="flex items-center p-2 rounded-lg bg-green-50 text-green-700 font-medium">
                                     <span className="mr-3">📝</span>
-                                    Isi Form
+                                    Fill Form
                                 </div>
                             </li>
                         </ul>
@@ -339,11 +345,21 @@ const ResignRequestPage: React.FC = () => {
             {/* Main Content */}
             <div className="flex-1 overflow-auto">
                 {/* Header */}
-                <header className="bg-white shadow-sm border-b border-green-100">
-                    <div className="flex items-center justify-between p-4">
-                        <div>
-                            <h1 className="text-2xl font-bold text-gray-900">Form Pengunduran Diri</h1>
-                            <p className="text-sm text-gray-500">Ajukan pengunduran diri untuk diri sendiri atau anggota tim</p>
+                <header className="bg-white shadow-sm border-b border-green-100 p-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                            <button
+                                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                                className="lg:hidden p-2 mr-2 rounded-md text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-green-500"
+                            >
+                                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
+                                </svg>
+                            </button>
+                            <div>
+                                <h1 className="text-xl md:text-2xl font-bold text-gray-900">Resignation Form</h1>
+                                <p className="text-xs md:text-sm text-gray-500">Submit a resignation for yourself or a team member</p>
+                            </div>
                         </div>
                         <div className="flex space-x-2">
                             <button
@@ -351,24 +367,24 @@ const ResignRequestPage: React.FC = () => {
                                 disabled={isSubmitting}
                                 className="px-4 py-2 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] disabled:opacity-50 transition"
                             >
-                                {isSubmitting ? "Mengajukan..." : "Ajukan Sekarang"}
+                                {isSubmitting ? "Submitting..." : "Submit Now"}
                             </button>
                         </div>
                     </div>
                 </header>
 
                 {/* Main Content */}
-                <main className="p-6">
+                <main className="p-4 md:p-6">
                     <div className="grid grid-cols-1 gap-6">
-                        {/* Kolom Kiri: Form */}
+                        {/* Form Column */}
                         <div className="md:col-span-2 space-y-6">
-                            <div className="bg-white rounded-xl shadow-md p-6 border border-green-100">
+                            <div className="bg-white rounded-xl shadow-md p-4 md:p-6 border border-green-100">
                                 <form onSubmit={handleSubmit} className="space-y-6">
 
-                                    {/* Jenis Pengajuan */}
-                                    {isManager && (
+                                    {/* Submission Type */}
+                                    
                                         <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                            <h3 className="text-lg font-semibold text-gray-900 mb-2">Jenis Pengajuan</h3>
+                                            <h3 className="text-lg font-semibold text-gray-900 mb-2">Submission Type</h3>
                                             <div className="flex space-x-4">
                                                 <div className="flex items-center">
                                                     <input
@@ -380,7 +396,7 @@ const ResignRequestPage: React.FC = () => {
                                                         onChange={handleRequestTypeChange}
                                                         className="h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500"
                                                     />
-                                                    <label htmlFor="self" className="ml-2 block text-sm font-medium text-gray-700">Untuk Diri Sendiri</label>
+                                                    <label htmlFor="self" className="ml-2 block text-sm font-medium text-gray-700">For Myself</label>
                                                 </div>
                                                 <div className="flex items-center">
                                                     <input
@@ -392,18 +408,18 @@ const ResignRequestPage: React.FC = () => {
                                                         onChange={handleRequestTypeChange}
                                                         className="h-4 w-4 text-green-600 border-gray-300 focus:ring-green-500"
                                                     />
-                                                    <label htmlFor="team" className="ml-2 block text-sm font-medium text-gray-700">Untuk Anggota Tim</label>
+                                                    <label htmlFor="team" className="ml-2 block text-sm font-medium text-gray-700">For a Team Member</label>
                                                 </div>
                                             </div>
                                         </div>
-                                    )}
+                                    
 
-                                    {/* Informasi Pengaju */}
+                                    {/* Requester Information */}
                                     <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Informasi Pengaju</h3>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Requester Information</h3>
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <div>
-                                                <p className="text-sm font-medium text-gray-700">Nama</p>
+                                                <p className="text-sm font-medium text-gray-700">Name</p>
                                                 <p className="mt-1 text-sm text-gray-900">{userProfile.nama}</p>
                                             </div>
                                             <div>
@@ -411,19 +427,18 @@ const ResignRequestPage: React.FC = () => {
                                                 <p className="mt-1 text-sm text-gray-900">{userProfile.nik}</p>
                                             </div>
                                             <div>
-                                                <p className="text-sm font-medium text-gray-700">Departemen</p>
+                                                <p className="text-sm font-medium text-gray-700">Department</p>
                                                 <p className="mt-1 text-sm text-gray-900">{userDeptName || "Loading..."}</p>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Pemilihan Anggota Tim */}
-                                    {requestType === "team" && isManager && (
+                                    {/* Team Member Selection */}
                                         <div>
-                                            <h3 className="text-lg font-semibold text-gray-900 mb-2">Pilih Anggota Tim</h3>
+                                            <h3 className="text-lg font-semibold text-gray-900 mb-2">Select Team Member</h3>
                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                 <div>
-                                                    <label htmlFor="departmentId" className="block text-sm font-medium text-gray-700 mb-1">Departemen</label>
+                                                    <label htmlFor="departmentId" className="block text-sm font-medium text-gray-700 mb-1">Department</label>
                                                     <select
                                                         id="departmentId"
                                                         name="departmentId"
@@ -432,7 +447,7 @@ const ResignRequestPage: React.FC = () => {
                                                         className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                         required
                                                     >
-                                                        <option value="">Pilih Departemen</option>
+                                                        <option value="">Select Department</option>
                                                         {departments.map(dept => (
                                                             <option key={dept.id} value={dept.id}>
                                                                 {dept.name}
@@ -441,7 +456,7 @@ const ResignRequestPage: React.FC = () => {
                                                     </select>
                                                 </div>
                                                 <div>
-                                                    <label htmlFor="employeeId" className="block text-sm font-medium text-gray-700 mb-1">Anggota Tim</label>
+                                                    <label htmlFor="employeeId" className="block text-sm font-medium text-gray-700 mb-1">Team Member</label>
                                                     <select
                                                         id="employeeId"
                                                         name="employeeId"
@@ -451,7 +466,7 @@ const ResignRequestPage: React.FC = () => {
                                                         disabled={!selectedDeptId || employees.length === 0}
                                                         required
                                                     >
-                                                        <option value="">Pilih Anggota Tim</option>
+                                                        <option value="">Select Team Member</option>
                                                         {employees.map(employee => (
                                                             <option key={employee.id} value={employee.id}>
                                                                 {employee.nama} ({employee.nik})
@@ -459,19 +474,19 @@ const ResignRequestPage: React.FC = () => {
                                                         ))}
                                                     </select>
                                                     {selectedDeptId && employees.length === 0 && (
-                                                        <p className="text-sm text-red-500 mt-1">Tidak ada karyawan ditemukan di departemen ini</p>
+                                                        <p className="text-sm text-red-500 mt-1">No employees found in this department</p>
                                                     )}
                                                 </div>
                                             </div>
                                         </div>
-                                    )}
+                                    
 
-                                    {/* Detail Pengunduran Diri */}
+                                    {/* Resignation Details */}
                                     <div>
-                                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Detail Pengunduran Diri</h3>
+                                        <h3 className="text-lg font-semibold text-gray-900 mb-2">Resignation Details</h3>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                             <div>
-                                                <label htmlFor="resignationDate" className="block text-sm font-medium text-gray-700 mb-1">Tanggal Efektif Resign</label>
+                                                <label htmlFor="resignationDate" className="block text-sm font-medium text-gray-700 mb-1">Effective Resignation Date</label>
                                                 <input
                                                     type="date"
                                                     id="resignationDate"
@@ -484,14 +499,14 @@ const ResignRequestPage: React.FC = () => {
                                             </div>
                                         </div>
                                         <div className="mt-4">
-                                            <label htmlFor="reason" className="block text-sm font-medium text-gray-700 mb-1">Alasan Pengunduran Diri</label>
+                                            <label htmlFor="reason" className="block text-sm font-medium text-gray-700 mb-1">Reason for Resignation</label>
                                             <textarea
                                                 id="reason"
                                                 name="reason"
                                                 value={formData.reason}
                                                 onChange={handleInputChange}
                                                 rows={4}
-                                                placeholder="Jelaskan alasan pengunduran diri..."
+                                                placeholder="Explain the reason for resignation..."
                                                 className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 transition"
                                                 required
                                             />
@@ -501,7 +516,7 @@ const ResignRequestPage: React.FC = () => {
                             </div>
                         </div>
 
-                        {/* Kolom Kanan: Informasi Penting */}
+                        {/* Information Section */}
                         <div className="">
                             <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
                                 <div className="flex">
@@ -511,14 +526,14 @@ const ResignRequestPage: React.FC = () => {
                                         </svg>
                                     </div>
                                     <div className="ml-3">
-                                        <h3 className="text-sm font-medium text-yellow-800">Informasi Penting</h3>
+                                        <h3 className="text-sm font-medium text-yellow-800">Important Information</h3>
                                         <div className="mt-2 text-sm text-yellow-700">
                                             <ul className="list-disc list-inside space-y-1">
-                                                <li>Form ini digunakan untuk mengajukan pengunduran diri, baik untuk diri sendiri maupun anggota tim.</li>
-                                                <li>Pengajuan pengunduran diri memerlukan **1 bulan pemberitahuan** (notice period) sebelum tanggal efektif.</li>
-                                                <li>Setelah diajukan, form ini akan diteruskan untuk proses persetujuan.</li>
-                                                <li>Pastikan tanggal efektif dan alasan yang diberikan sudah benar.</li>
-                                                <li>Data anggota tim diambil dari koleksi <strong>employees</strong></li>
+                                                <li>This form is used to submit a resignation for yourself or a team member.</li>
+                                                <li>Resignation requests require a **1-month notice period** before the effective date.</li>
+                                                <li>Once submitted, this form will be forwarded for the approval process.</li>
+                                                <li>Ensure the effective date and reason provided are correct.</li>
+                                                <li>Team member data is retrieved from the **employees** collection.</li>
                                             </ul>
                                         </div>
                                     </div>
@@ -533,7 +548,7 @@ const ResignRequestPage: React.FC = () => {
                             href="/forms"
                             className="px-6 py-2.5 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
                         >
-                            Batal
+                            Cancel
                         </Link>
                         <button
                             type="submit"
@@ -541,10 +556,9 @@ const ResignRequestPage: React.FC = () => {
                             disabled={isSubmitting}
                             className="px-6 py-2.5 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] text-white rounded-lg font-medium hover:from-[#6dbd5f] hover:to-[#43a047] disabled:opacity-50 transition"
                         >
-                            {isSubmitting ? "Mengajukan..." : "Ajukan Pengunduran Diri"}
+                            {isSubmitting ? "Submitting..." : "Submit Resignation"}
                         </button>
                     </div>
-
                 </main>
             </div>
         </div>

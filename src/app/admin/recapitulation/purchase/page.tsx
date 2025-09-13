@@ -52,6 +52,7 @@ const PurchaseRecapitulationPage: React.FC = () => {
   const [departments, setDepartments] = useState<string[]>([]);
   const [deptIdToName, setDeptIdToName] = useState<Map<string, string>>(new Map());
   const [selectedDept, setSelectedDept] = useState<string>("");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const router = useRouter();
 
   const safeToDate = (value: Timestamp | string): Date | null => {
@@ -180,7 +181,7 @@ const PurchaseRecapitulationPage: React.FC = () => {
           "No": no++,
           "Form ID": form.id,
           "Requester Name": form.requesterName,
-          "Date Submitted": safeToDate(form.createdAt)?.toLocaleDateString('id-ID'),
+          "Date Submitted": safeToDate(form.createdAt)?.toLocaleDateString('en-US'),
           "Department": deptIdToName.get(form.deptId as string),
           "Item Code": item.kodeItem,
           "Item Name": item.namaItem,
@@ -230,9 +231,9 @@ const PurchaseRecapitulationPage: React.FC = () => {
   let tableIndex = 0;
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
+    <div className="min-h-screen flex flex-col lg:flex-row bg-gradient-to-br from-[#f0fff0] to-[#e0f7e0]">
       {/* Sidebar */}
-      <div className="w-64 bg-white shadow-lg">
+      <div className={`fixed inset-y-0 left-0 w-64 bg-white shadow-lg z-50 transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} lg:relative lg:translate-x-0 transition-transform duration-300 ease-in-out`}>
         <div className="p-4 border-b border-green-100">
           <div className="flex items-center justify-center mb-4">
             <div className="w-12 h-12 bg-gradient-to-r from-[#7cc56f] to-[#4caf50] rounded-lg flex items-center justify-center shadow-md">
@@ -273,7 +274,20 @@ const PurchaseRecapitulationPage: React.FC = () => {
         {/* Header */}
         <header className="bg-white shadow-sm border-b border-green-100">
           <div className="flex items-center justify-between p-4">
-            <h1 className="text-2xl font-bold text-gray-900">Purchase Recapitulation</h1>
+            <div className="flex items-center">
+              <button
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className="lg:hidden p-2 mr-2 rounded-md text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-green-500"
+              >
+                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7" />
+                </svg>
+              </button>
+              <div>
+                <h1 className="text-xl md:text-2xl font-bold text-gray-900">Purchase Recapitulation</h1>
+                <p className="text-xs md:text-sm text-gray-500">View and export all purchase request data</p>
+              </div>
+            </div>
             <div className="flex items-center space-x-4">
               <div className="text-right">
                 <p className="font-medium text-gray-900">Hello, {user?.nama}</p>
@@ -315,8 +329,8 @@ const PurchaseRecapitulationPage: React.FC = () => {
                       <th className="py-3 px-4 text-sm font-semibold text-gray-600">Date Submitted</th>
                       <th className="py-3 px-4 text-sm font-semibold text-gray-600">Department</th>
                       <th className="py-3 px-4 text-sm font-semibold text-gray-600">Item Name</th>
-                      <th className="py-3 px-4 text-sm font-semibold text-gray-600">Spesifikasi</th>
-                      <th className="py-3 px-4 text-sm font-semibold text-gray-600">Qty</th>
+                      <th className="py-3 px-4 text-sm font-semibold text-gray-600">Specification</th>
+                      <th className="py-3 px-4 text-sm font-semibold text-gray-600">Quantity</th>
                       <th className="py-3 px-4 text-sm font-semibold text-gray-600">Unit</th>
                       <th className="py-3 px-4 text-sm font-semibold text-gray-600">Reason</th>
                       <th className="py-3 px-4 text-sm font-semibold text-gray-600">Status</th>
@@ -328,7 +342,7 @@ const PurchaseRecapitulationPage: React.FC = () => {
                         <td className="py-3 px-4 text-sm text-gray-600">{++tableIndex}</td>
                         <td className="py-3 px-4 text-sm font-medium text-gray-900">{form.id}</td>
                         <td className="py-3 px-4 text-sm text-gray-600">{form.requesterName}</td>
-                        <td className="py-3 px-4 text-sm text-gray-600">{safeToDate(form.createdAt)?.toLocaleDateString('id-ID')}</td>
+                        <td className="py-3 px-4 text-sm text-gray-600">{safeToDate(form.createdAt)?.toLocaleDateString('en-US')}</td>
                         <td className="py-3 px-4 text-sm text-gray-600">{deptIdToName.get(form.deptId as string)}</td>
                         <td className="py-3 px-4 text-sm text-gray-600">{item.namaItem}</td>
                         <td className="py-3 px-4 text-sm text-gray-600">{item.spek}</td>
